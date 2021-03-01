@@ -1,25 +1,27 @@
-1) checkout refactor branch
-2) build capsule
-3)
+
+;; 1) checkout refactor branch
+;; 2) build capsule
+;; 3)
 ;;3 cases: the entire demand, through ph4, and through ph3
 (require 'marathon.analysis.requirements.sensitivity)
 (ns marathon.analysis.requirements.sensitivity)
+(require '[marathon.analysis.tacmm.demo :as demo])
+
 ;;given a sequence of workbook paths, put separate text files into the out dir
 ;;each workbook name A-ph3.xlsx
 ;;for each bound, output A-ph3-bound.txt, stick filenames in a text file maybe
 ;;each case is scenario-ph3 or ph4 or return (ends after)-CMDD
 (def missed-days-2428 [0 10 20 30 60])
-(def res (contours output-path missed-days))
+;(def res (contours output-path missed-days))
 
 
-(defn req-analysis-experiment [in-paths out-dir missed-days]
-	(for [p in-paths
-		[bounds recs] (group-by :bound (contours p missed-days))
-		:let [wkbk-name (io/drop-ext (io/fname p))]]
-
-marathon.analysis/table-xform
-table-xform needs to operate on tables
-:tables come from (proj/load-project p)
+;; (defn req-analysis-experiment [in-paths out-dir missed-days]
+;;   (for [p in-paths
+;;         [bounds recs] (group-by :bound (contours p missed-days))
+;;         :let [wkbk-name (io/drop-ext (io/fname p))]]
+;;     marathon.analysis/table-xform
+;;     table-xform needs to operate on tables
+;;     :tables come from (proj/load-project p)
 		
 (def p
                                               (marathon.project/load-project "/home/craig/runs/test-run/testdata-v7-bog.xlsx"))
@@ -34,15 +36,21 @@ table-xform needs to operate on tables
 				(filter (fn [r] (= (:Name r) period)))
 				(:ToDay))]
 		;;Hopefully not nil. Might be "inf"
-		last-day))
-		
+          last-day))
 
+(defn change-last-day [period proj last-day]
+      (update :Parameters proj demo/xform-records
+        #(demo/merge-parameters % {:LastDayDefault last-day})))
+  
 ;;given a period name
 ;;marathon.analysis.tacmm.demo has stuff for updating parameters
 (defn update-last-day [period proj]
 	;;first get the period from the table
 	(let [last-day (get-last-day period proj)]
-		(if (= last-day "inf")
+          (if (= last-day "inf")
+            ;;this is the last period, so we don't to change the end day
+            identity
+            (change-last-day period proj))))
 			
 
 ;;better way to run multiple demands is have no DemandRecords or SupplyRecords in MARATHON workbook and then pull each demand 
@@ -57,9 +65,15 @@ table-xform needs to operate on tables
 ;;expect the same periods between workbooks
 
 (defn req-analysis-experiment [in-paths period-names missed-days out-dir]
-	(for [path in-paths
+	(doseq [path in-paths
 		period period-names
 		;;bind the transform here
 		
-		[bounds recs] (group-by :bound (contours p missed-days))
-		:let [wkbk-name (io/drop-ext (io/fname p))]]
+              [bounds recs]
+              (binding [marathon.analysis/*table-xform*
+                        #(update-last-day period  %)]
+                (group-by :bound (contours path missed-days)))
+              :let [wkbk-name (io/drop-ext (io/fname p))]]
+          
+          
+          ))
