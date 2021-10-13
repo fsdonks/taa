@@ -244,7 +244,7 @@ xs are records in a tabdelimited table."
                                    "Colorado" 4
                                    "Wyoming" 5
                                    "Idaho" 3
-                                   "WarDisrupt " 6)
+                                   "Vermont" 6)
                                    :Category (if (clojure.string/includes? Vignette
                                                                            "Fwd")
                                                "NonBOG"
@@ -252,14 +252,12 @@ xs are records in a tabdelimited table."
                                                  "Maine1" "NonBOG"
                                                  "Maine2" "NonBOG"
                                                  ;;"Maine3" "Rotational"
-                                                 "IdahoRot" "NonBOG"
                                                  Category
                                                  ))
                                    :SourceFirst (if (clojure.string/includes? Vignette
                                                                               "Fwd")
                                                   "NOT-RC-MIN"
                                                   (case Vignette
-                                                    "IdahoRot" "NOT-AC"
                                                     "Maine1"
                                                     "NOT-AC"
                                                     "Maine2" "NOT-AC"
