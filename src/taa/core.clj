@@ -148,8 +148,8 @@ xs are records in a tabdelimited table."
                                       )) ])
                      (into {} ) )
         src-war-idaho (->> (tbl/table-records (tbl/keywordize-field-names (tbls "SupplyDemand")))
-                      (reduce (fn [acc {:keys [SRC WarDefend]}]
-                                (assoc acc SRC WarDefend)) {})) ]
+                      (reduce (fn [acc {:keys [SRC Idaho]}]
+                                (assoc acc SRC Idaho)) {})) ]
     (paste-ordered-records! (idaho+cannibal-recs rc-supply src-war-idaho rc-unavail)
                             (conj demand-records-root-order
                                   (keyword "Title 10_32" )
