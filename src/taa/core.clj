@@ -36,8 +36,6 @@ xs are records in a tabdelimited table."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;demand building tools
-(def wbpath "resources/SupplyDemand.xlsx")
-(def tbls (xl/wb->tables (xl/as-workbook wbpath)))
 (def nonbog-record {:Vignette "RC_NonBOG-War"
                     :Type "DemandRecord"
                     :Category "NonBOG-RC-Only"
@@ -155,22 +153,22 @@ xs are records in a tabdelimited table."
                                   (keyword "Title 10_32" )
                                   :OITitle))))
 
-(defn get-vignettes [tbls]
-  (let [rs (tbl/table-records (tbl/keywordize-field-names (tbls
-                                                            "vignettes") ) ) ]
-    (paste-ordered-records! (->> (columns->records rs
-                                                   [:SRC :UNTDS] :Quantity :ForceCode)
-                              (map (fn [ {:keys [SRC] :as r} ]
-                                        (assoc (clojure.set/rename-keys r {:UNTDS :Title})
-                                               :SRC2 (subs SRC 0 2)
-                                               :Strength 1
-                                               :Titlel0_32 10
-                                               :Non-Rot ""
-                                               :Comments "") ) )
-                                        (remove (fn [r] (zero?
-                                                          (:Quantity r)))))
-                                        [:ForceCode :SRC2 :SRC :Title :Quantity :Strength 
-                                         :Titlel0_32 :Non-Rot :Comments])))
+(defn get-vignettes
+  "Return the vignette table records used for Demand Builder."
+  [vignette-recs]
+  (print (first vignette-recs))
+  (->> (columns->records vignette-recs
+                         [:SRC :UNTDS] :Quantity :ForceCode)
+       (map (fn [ {:keys [SRC] :as r} ]
+              (assoc (clojure.set/rename-keys r {:UNTDS :Title})
+                     :SRC2 (subs SRC 0 2)
+                     :Strength 1
+                     :Titlel0_32 10
+                     :Non-Rot ""
+                     :Comments "") ) )
+       (remove (fn [r] (or (nil? (:Quantity r))
+                           (zero?
+                        (:Quantity r)))))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;supply building tools
 (def other-fields

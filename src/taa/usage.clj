@@ -1,7 +1,17 @@
+(ns usage
+  (:require [clojure.java.io :as java.io]
+            [spork.util.table :as tbl]
+            [spork.util.io :as io]
+            [spork.util.excel.core :as xl]
+            ))
+
+(load-file "/home/craig/workspace/taa/src/taa/core.clj")
+
+(def resources-root "/home/craig/workspace/taa/resources/")
 ;;;;;;what usage.clj should be specifying:
 ;;path to SupplyDemand (also has a policy_map worksheet)
 (def supp-demand-path
-  "/resources/SupplyDemand_input.xlsx")
+  (str resources-root "SupplyDemand_input.xlsx"))
 ;;a set of vignettes to keep from SupplyDemand (ensure SupplyDemand
 ;;has RCAvailable and Idaho)
 (def vignettes
@@ -48,14 +58,14 @@
                                                     "Maine2" "NOT-AC"
                                     SourceFirst))))
 ;;a path to a FORGE output
-(def forge-path "/resources/Colorado.xlsx")
+(def forge-path (str resources-root "Colorado.xlsx"))
 ;;a name to concatenate to the Demand_Builder dir.
 (def identifier "Colorado")
 ;;a path to the timeline file
-(def timeline-path "/resources/timeline_Colorado.xlsx")
+(def timeline-path (str resources-root "timeline_Colorado.xlsx"))
 ;;an excursion name to prepend to files
 ;;path to a base marathon file
-(def base-m4 "/resources/base-testdata-v7.xlsx")
+(def base-m4 (str resources-root "base-testdata-v7.xlsx"))
 ;;phases
 (def phases [["comp" 1 821] ["phase-1" 822 854] ["phase-2" 855 974] ["phase-3" 975 1022] ["phase-4" 1023 1789]])
 ;;compo-lengths for rand-runs
@@ -66,9 +76,13 @@
 ;;and forge output for each demand
 ;;maybe one timeline file?
 
+;
 ;;FLOW: afer this, we output a vignettes file to the
-;;Excursion_Demand_Builder/ name
+;;Excursion_Demand_Builder/ 
 ;;directory.
+(def builder-inputs-path (str resources-root identifier "_inputs/"))
+(io/make-folders! builder-inputs-path)
+
 (defn load-workbook-recs
   "Given the path to an Excel workbook, load the first sheet as records."
   [path]
@@ -78,10 +92,35 @@
        (tbl/keywordize-field-names)
        (tbl/table-records)))
 
-(require '[spork.util.excel.core :as xl])
-(load-workbook-recs supp-demand-path)
+(defn records->string-name-table [recs]
+  (->> (tbl/records->table recs)
+       (tbl/stringify-field-names)
+  ))
+
+(defn records->xlsx [wbpath sheetname recs]
+  (->> (records->string-name-table recs)
+       (xl/table->xlsx wbpath sheetname)
+       ))
+
+
+(->> (load-workbook-recs supp-demand-path)
+     (map (fn [r]
+            (select-keys r (concat [:SRC :UNTDS]
+                                   (map keyword vignettes)))))
+     (taa.core/get-vignettes)
+     (records->xlsx (str builder-inputs-path
+                         "vignettes.xlsx") "Sheet1"))
+
+
 ;;move the timeline to this directory (copy)
-;;Excursion_SupplyRecords.xlsx gets outputted as well.
+(defn copy-file [source-path dest-path]
+  (java.io/copy (java.io/file source-path) (java.io/file dest-path)))
+
+(copy-file timeline-path (str builder-inputs-path "timeline.xlsx"))
+;;Excursion_SupplyRecords.xlsx gets outputted as well (maybe just put
+;;this in marathon workbook when I replace demand records as well.
+(def tbls (xl/wb->tables (xl/as-workbook supp-demand-path)))
+;(records->xlsx (str builder-inputs-path (supply-records2226 tbls)
 ;;save the SRC_by_day worksheet as tab delimitted text for demand builder
 ;;Take demand builder output and post process the demand and place in
 ;;the original directory  as Excursion_DemandRecords.xlsx
@@ -108,7 +147,7 @@
 ;;override the workbook path in taa2327 to point to the supply demand
 ;;file
 (def wbpath
-  "/resources/SupplyDemand_input.xlsx")
+  (str resources-root "SupplyDemand_input.xlsx"))
 ;;need to override the tables as well
 (def tbls (xl/wb->tables  (xl/as-workbook wbpath)))
 
