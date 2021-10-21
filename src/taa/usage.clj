@@ -83,34 +83,25 @@
 (def builder-inputs-path (str resources-root identifier "_inputs/"))
 (io/make-folders! builder-inputs-path)
 
-(defn load-workbook-recs
-  "Given the path to an Excel workbook, load the first sheet as records."
-  [path]
-  (-> (xl/as-workbook path)
-       (xl/wb->tables)
-       ((fn [tbls] (second (first tbls))))
-       (tbl/keywordize-field-names)
+(defn table->keyword-recs [table]
+    (-> (tbl/keywordize-field-names table)
        (tbl/table-records)))
 
-(defn records->string-name-table [recs]
-  (->> (tbl/records->table recs)
-       (tbl/stringify-field-names)
-  ))
+(defn load-workbook-recs
+  "Given the path to an Excel workbook, each sheet as records and
+  return a map of sheetname to records."
+  [path]
+  (->> (xl/as-workbook supp-demand-path)
+       (xl/wb->tables)
+       (reduce-kv (fn [acc sheet-name table]
+                    (assoc acc sheet-name (table->keyword-recs
+                                           table)))
+                  {})))
 
-(defn records->xlsx [wbpath sheetname recs]
-  (->> (records->string-name-table recs)
-       (xl/table->xlsx wbpath sheetname)
-       ))
+(def workbook-recs (load-workbook-recs supp-demand-path))
 
-
-(->> (load-workbook-recs supp-demand-path)
-     (map (fn [r]
-            (select-keys r (concat [:SRC :UNTDS]
-                                   (map keyword vignettes)))))
-     (taa.core/get-vignettes)
-     (records->xlsx (str builder-inputs-path
-                         "vignettes.xlsx") "Sheet1"))
-
+(taa.core/vignettes-to-file (workbook-recs "SupplyDemand") vignettes
+                            builder-inputs-path)
 
 ;;move the timeline to this directory (copy)
 (defn copy-file [source-path dest-path]
@@ -119,7 +110,6 @@
 (copy-file timeline-path (str builder-inputs-path "timeline.xlsx"))
 ;;Excursion_SupplyRecords.xlsx gets outputted as well (maybe just put
 ;;this in marathon workbook when I replace demand records as well.
-(def tbls (xl/wb->tables (xl/as-workbook supp-demand-path)))
 ;(records->xlsx (str builder-inputs-path (supply-records2226 tbls)
 ;;save the SRC_by_day worksheet as tab delimitted text for demand builder
 ;;Take demand builder output and post process the demand and place in

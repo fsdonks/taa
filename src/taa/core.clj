@@ -152,11 +152,10 @@ xs are records in a tabdelimited table."
                             (conj demand-records-root-order
                                   (keyword "Title 10_32" )
                                   :OITitle))))
-
+  
 (defn get-vignettes
   "Return the vignette table records used for Demand Builder."
   [vignette-recs]
-  (print (first vignette-recs))
   (->> (columns->records vignette-recs
                          [:SRC :UNTDS] :Quantity :ForceCode)
        (map (fn [ {:keys [SRC] :as r} ]
@@ -168,7 +167,31 @@ xs are records in a tabdelimited table."
                      :Comments "") ) )
        (remove (fn [r] (or (nil? (:Quantity r))
                            (zero?
-                        (:Quantity r)))))))
+                            (:Quantity r)))))))
+
+(defn records->string-name-table [recs]
+  (->> (tbl/records->table recs)
+       (tbl/stringify-field-names)
+  ))
+(defn records->xlsx [wbpath sheetname recs]
+  (->> (records->string-name-table recs)
+       (xl/table->xlsx wbpath sheetname)
+       ))
+
+(defn vignettes-to-file
+  "Given the standard supply demand records with vignettes as columns,
+  select only the columns for the vignettes we need, put them in a
+  long table format, and then output the vignettes to an excel file
+  for demand builder."
+  [raw-vignette-recs vignette-names out-dir]
+  (->> raw-vignette-recs
+       (map (fn [r]
+              (select-keys r (concat [:SRC :UNTDS]
+                                     (map keyword vignette-names)))))
+       (get-vignettes)
+       (records->xlsx (str out-dir
+                           "vignettes.xlsx") "Sheet1")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;supply building tools
 (def other-fields
