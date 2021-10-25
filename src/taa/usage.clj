@@ -3,8 +3,10 @@
             [spork.util.table :as tbl]
             [spork.util.io :as io]
             [spork.util.excel.core :as xl]
+            [spork.util.excel [docjure :as doc]
+             [core :as xl]]
             ))
-
+;(use 'dk.ative.docjure.spreadsheet)
 (load-file "/home/craig/workspace/taa/src/taa/core.clj")
 
 (def resources-root "/home/craig/workspace/taa/resources/")
@@ -81,7 +83,8 @@
 ;;Excursion_Demand_Builder/ 
 ;;directory.
 (def builder-inputs-path (str resources-root identifier "_inputs/"))
-(io/make-folders! builder-inputs-path)
+(def outputs-path (str builder-inputs-path "/Outputs/"))
+(io/make-folders! outputs-path)
 
 (defn table->keyword-recs [table]
     (-> (tbl/keywordize-field-names table)
@@ -110,10 +113,89 @@
 (copy-file timeline-path (str builder-inputs-path "timeline.xlsx"))
 ;;Excursion_SupplyRecords.xlsx gets outputted as well (maybe just put
 ;;this in marathon workbook when I replace demand records as well.
-;(records->xlsx (str builder-inputs-path (supply-records2226 tbls)
-;;save the SRC_by_day worksheet as tab delimitted text for demand builder
+;;(records->xlsx (str builder-inputs-path (supply-records2226 tbls)
+
+(def cell-type (atom nil))
+;;save the SRC_by_day worksheet as tab delimitted text for demand
+;;builder
+;;Need to rewrite read-cell to dispatch properly per below comments.
+;;Need to unmap a multimethod in order to redefine it.  Only changing
+;;the dispatching method and the CellType/STRING method.
+(ns-unmap 'dk.ative.docjure.spreadsheet 'read-cell)
+                                        ;(ns dk.ative.docjure.spreadsheet)
+(ns spork.util.excel.docjure)
+(require '[clojure.string :as string])
+;;For an unkown reason, getCellType is returning an int, which doesn't
+;;dispatch to any of the methods below.  One fix is to use the static
+;;method forInt to return the CellType object which will dispatch properly.
+(defmulti read-cell #(when % (. CellType (forInt (.getCellType ^Cell
+                                                               %)))))
+(defmethod read-cell CellType/BLANK     [_]     nil)
+(defmethod read-cell nil [_] nil)
+(defmethod read-cell CellType/STRING    [^Cell cell]
+  (let [s (.getStringCellValue cell)]
+    (if (string/includes? s "\n")
+      ;;Need put the cell values that have a newline in them
+      ;;in quotes so that it opens as tab
+      ;;delimited in Excel properly.
+      (str "\"" s "\"")
+      s)))                                                    
+(defmethod read-cell CellType/FORMULA   [^Cell cell]
+  (let [evaluator (.. cell getSheet getWorkbook
+                      getCreationHelper createFormulaEvaluator)
+        cv (.evaluate evaluator cell)]
+    (if (and (= CellType/NUMERIC (.getCellType cv))
+             (DateUtil/isCellDateFormatted cell))
+      (.getDateCellValue cell)
+      (read-cell-value cv false))))
+(defmethod read-cell CellType/BOOLEAN   [^Cell cell]  (.getBooleanCellValue cell))
+(defmethod read-cell CellType/NUMERIC   [^Cell cell]
+  (if (DateUtil/isCellDateFormatted cell)
+    (.getDateCellValue cell)
+    (.getNumericCellValue cell)))
+(defmethod read-cell CellType/ERROR     [^Cell cell]
+  (keyword (.name (FormulaError/forInt (.getErrorCellValue cell)))))
+
+(ns usage)
+(defn save-forge
+  "Save the src by day worksheet as tab delimited text for demand
+  builder."
+  [forge-path out-path]
+  (let [worksheet-rows (row-seq (xl/as-sheet "SRC_By_Day"
+                                                 forge-path))
+        worksheet-rows (->> (load-workbook forge-path)
+                            (select-sheet "SRC_By_Day")
+                            ((fn [x] (println (class x)) x))
+                            row-seq
+                            ((fn [x] (println (class x))  x))
+                            (map (fn [x] (if x (cell-seq x))))
+                            (map (fn [x] (println x) x))
+                            (map #(reduce str (interleave (map (fn [c]
+                                                                 (if
+                                                                     c
+                                                                   (do
+                                                                    (println c
+                                        ;(type
+                                        ;c)
+                                                                            (.getCellType
+                                                                             c))
+                                                                    (read-cell
+                                                                     c))
+                                                                   
+                                                                 (read-cell
+                                                                  
+                                                                  c))) %)
+                                                          (repeat "\t"))))
+                            
+                            ((fn [x] (interleave x (repeat "\n"))))
+                            ;;One extra newline to remove at the end.
+                            (butlast)
+                            (reduce str))]
+    (spit out-path worksheet-rows :append false)))
+
+(save-forge forge-path (str outputs-path identifier ".txt"))      
+     
 ;;Take demand builder output and post process the demand and place in
-;;the original directory  as Excursion_DemandRecords.xlsx
 ;;the Excursion_m4_workbook.xlsx
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py
