@@ -5,8 +5,8 @@
             [spork.util.excel.core :as xl]
             [spork.util.excel [docjure :as doc]
              [core :as xl]]
-            ))
-;(use 'dk.ative.docjure.spreadsheet)
+            [dk.ative.docjure.spreadsheet :as dj]))
+
 (load-file "/home/craig/workspace/taa/src/taa/core.clj")
 
 (def resources-root "/home/craig/workspace/taa/resources/")
@@ -123,7 +123,7 @@
 ;;the dispatching method and the CellType/STRING method.
 (ns-unmap 'dk.ative.docjure.spreadsheet 'read-cell)
                                         ;(ns dk.ative.docjure.spreadsheet)
-(ns spork.util.excel.docjure)
+(ns dk.ative.docjure.spreadsheet)
 (require '[clojure.string :as string])
 ;;For an unkown reason, getCellType is returning an int, which doesn't
 ;;dispatch to any of the methods below.  One fix is to use the static
@@ -156,12 +156,11 @@
 (defmethod read-cell CellType/ERROR     [^Cell cell]
   (keyword (.name (FormulaError/forInt (.getErrorCellValue cell)))))
 
-(ns usage)
 (defn save-forge
   "Save the src by day worksheet as tab delimited text for demand
   builder."
   [forge-path out-path]
-  (let [worksheet-rows (row-seq (xl/as-sheet "SRC_By_Day"
+  (let [worksheet-rows (row-seq (spork.util.excel.core/as-sheet "SRC_By_Day"
                                                  forge-path))
         worksheet-rows (->> (load-workbook forge-path)
                             (select-sheet "SRC_By_Day")
@@ -193,7 +192,8 @@
                             (reduce str))]
     (spit out-path worksheet-rows :append false)))
 
-(save-forge forge-path (str outputs-path identifier ".txt"))      
+(ns usage)
+(dj/save-forge forge-path (str outputs-path identifier ".txt"))      
      
 ;;Take demand builder output and post process the demand and place in
 ;;the Excursion_m4_workbook.xlsx
