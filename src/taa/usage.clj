@@ -1,3 +1,11 @@
+;;meant to be loaded from the marathon repl.
+;;To use the latest version of docjure with MARATHON, you need to put
+;;the dependency [dk.ative/docjure "1.16.0"] in the m4 project.clj.
+;;Used docjure proper instead of spork.util.excel.docjure because
+;;the latest version returns nil for blank cells.  blank cells were
+;;filtered out in older versions.  This allows us to copy  the data as
+;;is from an xlsx worksheet and then copy the same data to a tab
+;;delimited text file, similar to Excel->Save As->tab delimited text file.
 (ns usage
   (:require [clojure.java.io :as java.io]
             [spork.util.table :as tbl]
@@ -164,28 +172,12 @@
                                                  forge-path))
         worksheet-rows (->> (load-workbook forge-path)
                             (select-sheet "SRC_By_Day")
-                            ((fn [x] (println (class x)) x))
                             row-seq
-                            ((fn [x] (println (class x))  x))
                             (map (fn [x] (if x (cell-seq x))))
-                            (map (fn [x] (println x) x))
-                            (map #(reduce str (interleave (map (fn [c]
-                                                                 (if
-                                                                     c
-                                                                   (do
-                                                                    (println c
-                                        ;(type
-                                        ;c)
-                                                                            (.getCellType
-                                                                             c))
-                                                                    (read-cell
-                                                                     c))
-                                                                   
-                                                                 (read-cell
-                                                                  
-                                                                  c))) %)
-                                                          (repeat "\t"))))
-                            
+                            (map #(reduce str (interleave
+                                               (map (fn [c]
+                                                      (read-cell c)) %)
+                                               (repeat "\t"))))
                             ((fn [x] (interleave x (repeat "\n"))))
                             ;;One extra newline to remove at the end.
                             (butlast)
@@ -194,7 +186,7 @@
 
 (ns usage)
 (dj/save-forge forge-path (str outputs-path identifier ".txt"))      
-     
+
 ;;Take demand builder output and post process the demand and place in
 ;;the Excursion_m4_workbook.xlsx
 ;;Then run rand-runs on this, saving as Excursion_results.txt
