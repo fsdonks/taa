@@ -13,7 +13,7 @@
             [spork.util.excel [docjure :as doc]
              [core :as xl]]
             [dk.ative.docjure.spreadsheet :as dj]
-            [demand_builder.m4plugin :as plugin])
+            [demand_builder.m4plugin :as plugin]))
 
 (load-file "/home/craig/workspace/taa/src/taa/core.clj")
 
@@ -68,7 +68,7 @@
                                                     "Maine2" "NOT-AC"
                                     SourceFirst))))
 ;;a path to a FORGE output
-(def forge-path (str resources-root "Colorado.xlsx"))
+;;not needed.  Assume SRC_By_Day is in SupplyDemand
 ;;a name to concatenate to the Demand_Builder dir.
 (def identifier "Colorado")
 ;;a path to the timeline file
@@ -167,11 +167,9 @@
 
 (defn save-forge
   "Save the src by day worksheet as tab delimited text for demand
-  builder."
-  [forge-path out-path]
-  (let [worksheet-rows (row-seq (spork.util.excel.core/as-sheet "SRC_By_Day"
-                                                 forge-path))
-        worksheet-rows (->> (load-workbook forge-path)
+  builder.  Expect SRC_By_Day to be a worksheet in the SupplyDemand workbook."
+  [supp-demand-path out-path]
+  (let [worksheet-rows (->> (load-workbook supp-demand-path)
                             (select-sheet "SRC_By_Day")
                             row-seq
                             (map (fn [x] (if x (cell-seq x))))
@@ -186,7 +184,7 @@
     (spit out-path worksheet-rows :append false)))
 
 (ns usage)
-(dj/save-forge forge-path (str outputs-path "FORGE_SE-" identifier ".txt"))      
+(dj/save-forge supp-demand-path (str outputs-path "FORGE_SE-" identifier ".txt"))      
 
 ;;Take demand builder output and post process the demand
 ;;I think this is it...
