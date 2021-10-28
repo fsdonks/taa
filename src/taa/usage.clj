@@ -10,11 +10,10 @@
   (:require [clojure.java.io :as java.io]
             [spork.util.table :as tbl]
             [spork.util.io :as io]
-            [spork.util.excel.core :as xl]
             [spork.util.excel [docjure :as doc]
              [core :as xl]]
             [dk.ative.docjure.spreadsheet :as dj]
-            [demand_builder.m4plugin :as plugin]))
+            [demand_builder.m4plugin :as plugin])
 
 (load-file "/home/craig/workspace/taa/src/taa/core.clj")
 
@@ -209,6 +208,24 @@
 (plugin/root->demand-file builder-inputs-path)
 ;;and place in
 ;;the Excursion_m4_workbook.xlsx
+(defn replace-demand
+  "Given the path to a marathon workbook, replace the DemandRecords
+  worksheet with another demand records Spork table."
+  [m4-xlsx-path demand-table]
+  (-> (xl/as-workbook m4-xlsx-path)
+      (xl/wb->tables)
+      (assoc "DemandRecords" (tbl/stringify-field-names demand-table))
+      ((fn [table-map] (xl/tables->xlsx (str (io/fdir m4-xlsx-path)
+                                             "/m4_book_" identifier ".xlsx") table-map)))
+      ))
+
+(defn replace-demand-from
+  "Given the path to a marathon workbook and the path to a demand
+  records tab delimited text file, call replace-demand."
+  [m4-xlsx-path demand-path]
+  (replace-demand m4-xlsx-path (tbl/tabdelimited->table demand-path)))
+
+(replace-demand-from base-m4 (str outputs-path "Outputs_DEMAND.txt"))
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py
 
@@ -235,7 +252,7 @@
 ;;need to override the tables as well
 (def tbls (xl/wb->tables  (xl/as-workbook wbpath)))
 
-(paste-hld+cannibal! tbls) ;will give records for hld and cannibalized records.
+(paste-idaho+cannibal! tbls) ;will give records for hld and cannibalized records.
 ;still got an error because some values aren't a number..... turn stuff to 0s or delete.
 
 (get-vignettes tbls) ;will return the vignettes for demand builder
