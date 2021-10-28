@@ -13,7 +13,8 @@
             [spork.util.excel.core :as xl]
             [spork.util.excel [docjure :as doc]
              [core :as xl]]
-            [dk.ative.docjure.spreadsheet :as dj]))
+            [dk.ative.docjure.spreadsheet :as dj]
+            [demand_builder.m4plugin :as plugin]))
 
 (load-file "/home/craig/workspace/taa/src/taa/core.clj")
 
@@ -146,7 +147,8 @@
       ;;Need put the cell values that have a newline in them
       ;;in quotes so that it opens as tab
       ;;delimited in Excel properly.
-      (str "\"" s "\"")
+                                        ;(str "\"" s "\"")
+      (string/replace s #"\n" "")
       s)))                                                    
 (defmethod read-cell CellType/FORMULA   [^Cell cell]
   (let [evaluator (.. cell getSheet getWorkbook
@@ -185,9 +187,27 @@
     (spit out-path worksheet-rows :append false)))
 
 (ns usage)
-(dj/save-forge forge-path (str outputs-path identifier ".txt"))      
+(dj/save-forge forge-path (str outputs-path "FORGE_SE-" identifier ".txt"))      
 
-;;Take demand builder output and post process the demand and place in
+;;Take demand builder output and post process the demand
+;;I think this is it...
+(require 'demand_builder.forgeformatter)
+(ns demand_builder.forgeformatter)
+(defn read-forge [filename]
+  (let [l (str/split (slurp filename) (re-pattern (System/getProperty "line.separator")))
+        formatter #(if (and (str/includes? % "TP") (str/includes? % "Day"))
+                       (read-num (str/replace (first (str/split % #"TP")) "Day " "")) %)
+          phases (str/split (first l) #"\t")
+          header (map formatter (str/split (second l) #"\t"))
+          h (count (filter #(not (number? %)) header))
+          formatted-phases (apply conj (map #(hash-map (first %) (second %))
+                                         (filter #(not= "" (first %)) (zipmap (drop h phases) (sort (filter number? header))))))
+          data (map #(str/split % #"\t") (into [] (drop 2 l)))
+          formatted-data (map #(zipmap header %) (filter #(and (>= (count %) h) (not= "" (first %))) data))]
+    {:header header :phases formatted-phases :data formatted-data}))
+(ns usage)
+(plugin/root->demand-file builder-inputs-path)
+;;and place in
 ;;the Excursion_m4_workbook.xlsx
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py

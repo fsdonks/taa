@@ -162,7 +162,7 @@ xs are records in a tabdelimited table."
               (assoc (clojure.set/rename-keys r {:UNTDS :Title})
                      :SRC2 (subs SRC 0 2)
                      :Strength 1
-                     :Titlel0_32 10
+                     :Title10_32 10
                      :Non-Rot ""
                      :Comments "") ) )
        (remove (fn [r] (or (nil? (:Quantity r))
