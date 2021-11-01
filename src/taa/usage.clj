@@ -14,15 +14,22 @@
              [core :as xl]]
             [dk.ative.docjure.spreadsheet :as dj]
             [demand_builder.m4plugin :as plugin]
-            [marathon.analysis.random :as random]))
+            [marathon.analysis.random :as random]
+            [marathon.analysis :as a]))
 
 (load-file "/home/craig/workspace/taa/src/taa/core.clj")
 
 (def resources-root "/home/craig/workspace/taa/resources/")
 ;;;;;;what usage.clj should be specifying:
 ;;path to SupplyDemand (also has a policy_map worksheet)
+;; no matching clause exceptions might be for N/As in excel formulas
+;; when reading workbooks into clojure. Change these values to
+;; something else, like "na".
+;;will also get an error when some values for idaho and RC availble
+;;aren't numbers..... turn stuff to 0s or delete.
+;;make sure strength in SRC_By_Day has numbers! if not, set to 0)
 (def supp-demand-path
-  (str resources-root "SupplyDemand_input.xlsx"))
+  (str resources-root "SupplyDemand_Colorado.xlsx"))
 ;;a set of vignettes to keep from SupplyDemand (ensure SupplyDemand
 ;;has RCAvailable and Idaho)
 (def vignettes
@@ -36,7 +43,7 @@
     ;"Idaho"
     "Vermont"})
 ;; a default RC policy name
-(def default-rc-policy "TAA22-26 RCSurge_Default_Composite")
+(def default-rc-policy "TAA_2125_Capacity_RC_1")
 ;;a post-process function with priority, category, and sourcefirst
 ;;post process demand records to copy vignette to DemandGroup and
 ;;set priorities
@@ -87,6 +94,15 @@
 (def phases [["comp" 1 821] ["phase-1" 822 854] ["phase-2" 855 974] ["phase-3" 975 1022] ["phase-4" 1023 1789]])
 ;;compo-lengths for rand-runs
 (def compo-lengths {"AC" 1 "RC" 2 "NG" 3})
+
+;;usually 30
+(def reps 1)
+;;usually 0
+(def lower 1)
+;;usually 1
+(def upper 1)
+;;20 for Keith and I on SNET
+(def threads 1)
 
 ;; so the taa dir will have
 ;;a supply demand workbook for each demand
@@ -211,31 +227,15 @@
     {:header header :phases formatted-phases :data formatted-data}))
 (ns usage)
 (plugin/root->demand-file builder-inputs-path)
+
 ;;and place in
 ;;the Excursion_m4_workbook.xlsx
-(defn replace-demand
-  "Given the path to a marathon workbook, replace the DemandRecords
-  worksheet with another demand records Spork table."
-  [m4-xlsx-path demand-table]
-  (-> (xl/as-workbook m4-xlsx-path)
-      (xl/wb->tables)
-      (assoc "DemandRecords" (tbl/stringify-field-names demand-table))
-      ((fn [table-map] (xl/tables->xlsx (str (io/fdir m4-xlsx-path)
-                                             "/m4_book_" identifier ".xlsx") table-map)))
-      ))
-
-(defn replace-demand-from
-  "Given the path to a marathon workbook and the path to a demand
-  records tab delimited text file, call replace-demand."
-  [m4-xlsx-path demand-path]
-  (replace-demand m4-xlsx-path (tbl/tabdelimited->table demand-path)))
-
-(replace-demand-from base-m4 (str outputs-path "Outputs_DEMAND.txt"))
+(def out-path (str (io/fdir base-m4) "/m4_book_" identifier ".xlsx"))
 
 (defn replace-demand-and-supply
   "Load up a marathon workbook and replace the demand records and
   supply records."
-  [m4-xlsx-path demand-path supp-demand-path id]
+  [m4-xlsx-path demand-path supp-demand-path out-path]
   (let [initial-tables (-> (xl/as-workbook m4-xlsx-path)
                            (xl/wb->tables))
         demand-table (->> (tbl/tabdelimited->records demand-path)
@@ -244,85 +244,22 @@
                                    workbook-recs))
                           (map set-demand-params)
                           (taa.core/records->string-name-table))
-        supply-table (taa.core/supply-table workbook-recs)
+        supply-table (taa.core/supply-table workbook-recs default-rc-policy)
         table-res (merge initial-tables {"DemandRecords" demand-table
                                          "SupplyRecords" supply-table})]
-    (xl/tables->xlsx (str (io/fdir m4-xlsx-path)
-                                             "/m4_book_" id ".xlsx") table-res)
+    (xl/tables->xlsx out-path table-res)
         ))
 
 (replace-demand-and-supply base-m4 (str outputs-path
                                         "Outputs_DEMAND.txt")
-                                        supp-demand-path identifier)
+                                        supp-demand-path out-path)
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py
 
-
-
-;;;;;what we used to do:
-;;delete all worksheets except for supplydemand.  maybe
-;;need new FORGE
-
-;; no matching clause exceptions might be for N/As in excel formulas when reading workbooks into clojure. Change these values to something else, like "na".
-
-;; Move out vignettes to a "vignettes" worksheet (exclude Idaho and
-;; Colorado)
-;;better: provide a list of vignettes to keep here in usage, so some
-;; function creates tbls with vignettes
-
-;; These instructions are meant for the taa Clojure project.
-;;load this from marathon:
-
-(load-file "/home/craig/workspace/taa/src/taa/core.clj")
-(ns taa2327)
-;;override the workbook path in taa2327 to point to the supply demand
-;;file
-(def wbpath
-  (str resources-root "SupplyDemand_input.xlsx"))
-;;need to override the tables as well
-(def tbls (xl/wb->tables  (xl/as-workbook wbpath)))
-
-(paste-idaho+cannibal! tbls) ;will give records for hld and cannibalized records.
-;still got an error because some values aren't a number..... turn stuff to 0s or delete.
-
-(get-vignettes tbls) ;will return the vignettes for demand builder
-
-(supply-records2226 tbls)
-;supply-records2226 will return the supply records
-
-Now, to run demand_builder:
-
-;;no input map is needed
-(require 'demand_builder.m4plugin)
-(ns demand_builder.m4plugin)
-(def t2337 "K:\\Divisions\\FS\\_Study Files\\TAA
-  23-27\\Inputs\\Demand_Builder\\")
-;;I think this is it...
-(root->demand-file t2337)
-;;this might throw an error because of the SRC_By_Day newline errors, but necessary to set up files in Ouputs/ (although it might not...)
-;;error is NullPointerException java.util.regex.Matcher.getTextLength (:-1)
-
-;(make sure strength has number! if not, set to 0)
-;no strength for the following SRCs:
-
-;;open each Forge file and save SRC_By_Day sheet as tab delimited in Outputs/
-(require 'demand_builder.formatter)
-(ns demand_builder.formatter)
-(root->demandfile (str demand_builder.m4plugin/t2337 "Outputs/"))
-
-;;use post-process-demand function to do this (copy demandrecords first)
-
-;now, change priorities according to the parameters word document
-;copy vignette to demandgroup
-
-(capacity-analysis "somepath/m4book-2327.xlsx")
-
-marathon.analysis.random
-(comment
-;;way to invoke function
-(def path "somepath/m4book-2327.xlsx")
-(def proj (a/load-project path))
-(def phases [["comp" 1 821] ["phase-1" 822 854] ["phase-2" 855 974] ["phase-3" 975 1022] ["phase-4" 1023 1789]])
-(def cuts_1 (rand-runs proj 16 phases 0 1.5))
-(def cuts_2 (rand-runs proj 16 phases 0 1.5))
+(def proj (a/load-project out-path))
+(binding [random/*threads* threads]
+  (def results (random/rand-runs proj :reps reps :phases phases :lower lower
+                                 :upper upper :compo-lengths
+                                 compo-lengths)))
+(random/write-output (str resources-root "results_" identifier ".txt") results)
 )

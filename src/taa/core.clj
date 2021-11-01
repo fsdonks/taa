@@ -204,9 +204,8 @@ xs are records in a tabdelimited table."
    :Location "Auto",
    :position "Auto"})
 
-(def default-policy-name "TAA22-26 RCSurge_Default_Composite")
 (defn supply-table
-  "Given" [record-map]
+  "Given" [record-map rc-default-policy]
   (let [rs (->> (record-map "SupplyDemand")
              (map ( fn [r] ( select-keys r
                                          [:SRC :UNTDS :RA :ARNG :USAR]))))
@@ -228,7 +227,7 @@ xs are records in a tabdelimited table."
                                         (if-let [p (policy-map5
                                                      (subs SRC 0 5))]
                                           p
-                                          default-policy-name))]]
+                                          rc-default-policy))]]
                      (assoc
                        (clojure.set/rename-keys (merge other-fields
                                                        r) {:UNTDS :OITitle})
