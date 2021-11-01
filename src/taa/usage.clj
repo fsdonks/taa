@@ -13,7 +13,8 @@
             [spork.util.excel [docjure :as doc]
              [core :as xl]]
             [dk.ative.docjure.spreadsheet :as dj]
-            [demand_builder.m4plugin :as plugin]))
+            [demand_builder.m4plugin :as plugin]
+            [marathon.analysis.random :as random]))
 
 (load-file "/home/craig/workspace/taa/src/taa/core.clj")
 
@@ -37,6 +38,12 @@
 ;; a default RC policy name
 (def default-rc-policy "TAA22-26 RCSurge_Default_Composite")
 ;;a post-process function with priority, category, and sourcefirst
+;;post process demand records to copy vignette to DemandGroup and
+;;set priorities
+;;Change Forward stationed category to NonBOG , SourceFirst to NOT-RC-MIN
+;;PTDOS are regular category =Rotational and SourceFirst = NOT-RC
+;;Idaho-Competition is category = NonBOG and SourceFirst = NOT-AC
+;;Idaho is category = NonBOG and SourceFirst = NOT-AC-MIN
 (defn set-demand-params [{:keys [Vignette Category SourceFirst] :as r}]
                             (assoc r :DemandGroup Vignette
                                    :Priority (case Vignette
@@ -46,7 +53,7 @@
                                    "Maine1" 2
                                    "Maine2" 2
                                    "Maine3" 2
-                                   "Colorado" 4
+                                   "SE-Colorado" 4
                                    "Wyoming" 5
                                    "Idaho" 3
                                    "Vermont" 6)
@@ -224,8 +231,33 @@
   (replace-demand m4-xlsx-path (tbl/tabdelimited->table demand-path)))
 
 (replace-demand-from base-m4 (str outputs-path "Outputs_DEMAND.txt"))
+
+(defn replace-demand-and-supply
+  "Load up a marathon workbook and replace the demand records and
+  supply records."
+  [m4-xlsx-path demand-path supp-demand-path id]
+  (let [initial-tables (-> (xl/as-workbook m4-xlsx-path)
+                           (xl/wb->tables))
+        demand-table (->> (tbl/tabdelimited->records demand-path)
+                          (into [])
+                          (concat (taa.core/get-idaho+cannibal-recs
+                                   workbook-recs))
+                          (map set-demand-params)
+                          (taa.core/records->string-name-table))
+        supply-table (taa.core/supply-table workbook-recs)
+        table-res (merge initial-tables {"DemandRecords" demand-table
+                                         "SupplyRecords" supply-table})]
+    (xl/tables->xlsx (str (io/fdir m4-xlsx-path)
+                                             "/m4_book_" id ".xlsx") table-res)
+        ))
+
+(replace-demand-and-supply base-m4 (str outputs-path
+                                        "Outputs_DEMAND.txt")
+                                        supp-demand-path identifier)
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py
+
+
 
 ;;;;;what we used to do:
 ;;delete all worksheets except for supplydemand.  maybe

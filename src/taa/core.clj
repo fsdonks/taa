@@ -121,16 +121,20 @@ xs are records in a tabdelimited table."
    :Vignette
    :Operation
    :Category] )
-               
-(defn paste-idaho+cannibal! [tbls]
-  (let [available-rc (->> (tbl/table-records (tbl/keywordize-field-names (tbls "SupplyDemand")))
+
+(defn records->string-name-table [recs]
+  (->> (tbl/records->table recs)
+       (tbl/stringify-field-names)
+       ))
+
+(defn get-idaho+cannibal-recs [workbook-recs]
+  (let [available-rc (->> (workbook-recs "SupplyDemand")
                        (reduce (fn [acc {:keys [SRC
                                                 RCAvailable] } ]
                                  (if (number? RCAvailable)
                                    (assoc acc SRC RCAvailable)
                                    acc) ) {}) )
-        rc-supply (->> (tbl/table-records (tbl/keywordize-field-names
-                                            (tbls "SupplyDemand")))
+        rc-supply (->> (workbook-recs "SupplyDemand")
                     (map (fn [{:keys [SRC ARNG USAR]}] [SRC
                                                         (reduce + (remove nil? [ARNG USAR]))]))
                     (into {}))
@@ -145,13 +149,10 @@ xs are records in a tabdelimited table."
                                       ;;stopped.  should just rescan
                                       )) ])
                      (into {} ) )
-        src-war-idaho (->> (tbl/table-records (tbl/keywordize-field-names (tbls "SupplyDemand")))
+        src-war-idaho (->> (workbook-recs "SupplyDemand")
                       (reduce (fn [acc {:keys [SRC Idaho]}]
                                 (assoc acc SRC Idaho)) {})) ]
-    (paste-ordered-records! (idaho+cannibal-recs rc-supply src-war-idaho rc-unavail)
-                            (conj demand-records-root-order
-                                  (keyword "Title 10_32" )
-                                  :OITitle))))
+    (idaho+cannibal-recs rc-supply src-war-idaho rc-unavail)))
   
 (defn get-vignettes
   "Return the vignette table records used for Demand Builder."
@@ -169,10 +170,6 @@ xs are records in a tabdelimited table."
                            (zero?
                             (:Quantity r)))))))
 
-(defn records->string-name-table [recs]
-  (->> (tbl/records->table recs)
-       (tbl/stringify-field-names)
-  ))
 (defn records->xlsx [wbpath sheetname recs]
   (->> (records->string-name-table recs)
        (xl/table->xlsx wbpath sheetname)
@@ -208,18 +205,16 @@ xs are records in a tabdelimited table."
    :position "Auto"})
 
 (def default-policy-name "TAA22-26 RCSurge_Default_Composite")
-(defn supply-records2226 [tbls]
-  (let [rs (->> (tbls "SupplyDemand")
-             (tbl/keywordize-field-names)
-             (tbl/table-records)
+(defn supply-table
+  "Given" [record-map]
+  (let [rs (->> (record-map "SupplyDemand")
              (map ( fn [r] ( select-keys r
                                          [:SRC :UNTDS :RA :ARNG :USAR]))))
         tblr (->> (columns->records rs
                                     [:SRC :UNTDS] :Quantity :Component)
                (filter (fn [{:keys [Quantity]}] (and Quantity
                                                      (not (zero? Quantity))))))
-        policy-map (->> (tbl/table-records (tbl/keywordize-field-names
-                                             (tbls "policy_map") ))
+        policy-map (->> (record-map "policy_map") 
                      (reduce (fn [acc {:keys [SRC
                                               CompositePolicyName]}]
                                (assoc acc SRC
@@ -240,61 +235,23 @@ xs are records in a tabdelimited table."
                        :Component (case Component "RA" "AC" "ARNG"
                                     "NG" "USAR" "RC")
                        :Policy (if (= Component "RA") "Auto"
-                                 policy) ) ) ]
-(paste-ordered-records! final-recs
-[:Type :Enabled :Quantity :SRC :Component :OITitle :Name
-:Behavior :CycleTime :Policy :Tags :Spawntime :Location :Position])))
+                                   policy) ) ) ]
+    (records->string-name-table final-recs)
+;(paste-ordered-records! final-recs
+;[:Type :Enabled :Quantity :SRC :Component :OITitle :Name
+ ;:Behavior :CycleTime :Policy :Tags :Spawntime :Location :Position]
+))
 
-;;post process demand records to copy vignette to DemandGroup and
-;;set priorities
-;;Change Forward stationed category to NonBOG , SourceFirst to NOT-RC-MIN
-;;PTDOS are regular category =Rotational and SourceFirst = NOT-RC
-;;Idaho-Competition is category = NonBOG and SourceFirst = NOT-AC
-;;Idaho is category = NonBOG and SourceFirst = NOT-AC-MIN
-(defn post-process-demand []
-  (paste-ordered-records! (for [{:keys [Vignette Category
-                                        SourceFirst] :as r} (tbl/copy-records!) ]
-                            (assoc r :DemandGroup Vignette
-                                   :Priority (case Vignette
-                                   "RC_NonBOG-War" 1
-                                   "AlaskaFwd" 1
-                                   "AlaskaRot" 6
-                                   "Maine1" 2
-                                   "Maine2" 2
-                                   "Maine3" 2
-                                   "Colorado" 4
-                                   "Wyoming" 5
-                                   "Idaho" 3
-                                   "Vermont" 6)
-                                   :Category (if (clojure.string/includes? Vignette
-                                                                           "Fwd")
-                                               "NonBOG"
-                                               (case Vignette
-                                                 "Maine1" "NonBOG"
-                                                 "Maine2" "NonBOG"
-                                                 ;;"Maine3" "Rotational"
-                                                 Category
-                                                 ))
-                                   :SourceFirst (if (clojure.string/includes? Vignette
-                                                                              "Fwd")
-                                                  "NOT-RC-MIN"
-                                                  (case Vignette
-                                                    "Maine1"
-                                                    "NOT-AC"
-                                                    "Maine2" "NOT-AC"
-                                    SourceFirst
-                                    ) )
-                       )) (conj demand-records-root-order :Titlel0_32 :OITitle)))
-        ;;supply: search for parent, child relationship
-        ;;make a set of SRCs. filter that set such that if the parent
-        ;;exists, so does the child.
-        {:ParentSRC " 01300K000", :ChildSRC "01205K000"}
-        
-        {:ParentSRC "01300K000", :ChildSRC "01205K000"}
-        
-        ;; (def pc-recs (tbl/copy-records!))
-        ;; (def supply-recs (tbl/copy-records!))
-        
+;;supply: search for parent, child relationship
+;;make a set of SRCs. filter that set such that if the parent
+;;exists, so does the child.
+{:ParentSRC " 01300K000", :ChildSRC "01205K000"}
+
+{:ParentSRC "01300K000", :ChildSRC "01205K000"}
+
+;; (def pc-recs (tbl/copy-records!))
+;; (def supply-recs (tbl/copy-records!))
+
 (defn parent-and-child
   "returns those supply SRCs for which a child exists in the supply also."
   [pc-recs supply-recs]
