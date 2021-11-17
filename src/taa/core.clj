@@ -1,7 +1,16 @@
+;;This namespace is used to preprocess TAA inputs and do TAA runs
+;;using inputs like those specified in the accompanying usage.clj.
 (ns taa.core
   (:require [spork.util.table :as tbl]
-            [spork.util.excel.core :as xl]
-            [spork.util.clipboard :as board]))
+            [spork.util.clipboard :as board]
+            [clojure.java.io :as java.io]
+            [spork.util.io :as io]
+            [spork.util.excel [docjure :as doc]
+             [core :as xl]]
+            [dk.ative.docjure.spreadsheet :as dj]
+            [demand_builder.m4plugin :as plugin]
+            [marathon.analysis.random :as random]
+            [marathon.analysis :as a]))
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;utility functions
 (defn columns->records
@@ -36,7 +45,7 @@ xs are records in a tabdelimited table."
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;demand building tools
-(def nonbog-record {:Vignette "RC_NonBOG-War"
+(def nonbog-record (merge conflict-timeline {:Vignette "RC_NonBOG-War"
                     :Type "DemandRecord"
                     :Category "NonBOG-RC-Only"
                     :Overlap 45
@@ -47,11 +56,9 @@ xs are records in a tabdelimited table."
                     :Priority 4
                     (keyword "Title 10_32") 10
                     :Quantity nil
-                    :Duration 969
-                    :StartDay 731
                     :SRC nil
                     :DemandGroup "RC_NonBOG-War"
-                    :OITitle "unnecessary"})
+                    :OITitle "unnecessary"}))
 
 (def idaho-record (assoc nonbog-record
                        :Vignette "Idaho"
@@ -239,7 +246,226 @@ xs are records in a tabdelimited table."
 ;(paste-ordered-records! final-recs
 ;[:Type :Enabled :Quantity :SRC :Component :OITitle :Name
  ;:Behavior :CycleTime :Policy :Tags :Spawntime :Location :Position]
-))
+    ))
+
+;; so the taa dir will have
+;;a supply demand workbook for each demand
+;;and forge output for each demand
+;;maybe one timeline file?
+
+(defn table->keyword-recs [table]
+    (-> (tbl/keywordize-field-names table)
+       (tbl/table-records)))
+
+(defn load-workbook-recs
+  "Given the path to an Excel workbook, each sheet as records and
+  return a map of sheetname to records."
+  [path]
+  (->> (xl/as-workbook path)
+       (xl/wb->tables)
+       (reduce-kv (fn [acc sheet-name table]
+                    (assoc acc sheet-name (table->keyword-recs
+                                           table)))
+                  {})))
+
+(defn copy-file [source-path dest-path]
+  (java.io/copy (java.io/file source-path) (java.io/file dest-path)))
+
+;;save the SRC_by_day worksheet as tab delimitted text for demand
+;;builder
+;;Need to rewrite read-cell to dispatch properly per below comments.
+;;Need to unmap a multimethod in order to redefine it.  Only changing
+;;the dispatching method and the CellType/STRING method.
+(ns-unmap 'dk.ative.docjure.spreadsheet 'read-cell)
+                                        ;(ns dk.ative.docjure.spreadsheet)
+(ns dk.ative.docjure.spreadsheet)
+(require '[clojure.string :as string])
+;;For an unkown reason, getCellType is returning an int, which doesn't
+;;dispatch to any of the methods below.  One fix is to use the static
+;;method forInt to return the CellType object which will dispatch properly.
+(defmulti read-cell #(when % (. CellType (forInt (.getCellType ^Cell
+                                                               %)))))
+(defmethod read-cell CellType/BLANK     [_]     nil)
+(defmethod read-cell nil [_] nil)
+(defmethod read-cell CellType/STRING    [^Cell cell]
+  (let [s (.getStringCellValue cell)]
+    (if (string/includes? s "\n")
+      ;;Need put the cell values that have a newline in them
+      ;;in quotes so that it opens as tab
+      ;;delimited in Excel properly.
+                                        ;(str "\"" s "\"")
+      (string/replace s #"\n" "")
+      s)))                                                    
+(defmethod read-cell CellType/FORMULA   [^Cell cell]
+  (let [evaluator (.. cell getSheet getWorkbook
+                      getCreationHelper createFormulaEvaluator)
+        cv (.evaluate evaluator cell)]
+    (if (and (= CellType/NUMERIC (.getCellType cv))
+             (DateUtil/isCellDateFormatted cell))
+      (.getDateCellValue cell)
+      (read-cell-value cv false))))
+(defmethod read-cell CellType/BOOLEAN   [^Cell cell]  (.getBooleanCellValue cell))
+(defmethod read-cell CellType/NUMERIC   [^Cell cell]
+  (if (DateUtil/isCellDateFormatted cell)
+    (.getDateCellValue cell)
+    (.getNumericCellValue cell)))
+(defmethod read-cell CellType/ERROR     [^Cell cell]
+  (keyword (.name (FormulaError/forInt (.getErrorCellValue cell)))))
+
+(defn save-forge
+  "Save the src by day worksheet as tab delimited text for demand
+  builder.  Expect SRC_By_Day to be a worksheet in the SupplyDemand workbook."
+  [supp-demand-path out-path]
+  (let [worksheet-rows (->> (load-workbook supp-demand-path)
+                            (select-sheet "SRC_By_Day")
+                            row-seq
+                            (map (fn [x] (if x (cell-seq x))))
+                            (map #(reduce str (interleave
+                                               (map (fn [c]
+                                                      (read-cell c)) %)
+                                               (repeat "\t"))))
+                            ((fn [x] (interleave x (repeat "\n"))))
+                            ;;One extra newline to remove at the end.
+                            (butlast)
+                            (reduce str))]
+    (spit out-path worksheet-rows :append false)))
+
+(ns taa.core)   
+
+;;Take demand builder output and post process the demand
+;;I think this is it...
+(require 'demand_builder.forgeformatter)
+(ns demand_builder.forgeformatter)
+(defn read-forge [filename]
+  (let [l (str/split (slurp filename) (re-pattern (System/getProperty "line.separator")))
+        formatter #(if (and (str/includes? % "TP") (str/includes? % "Day"))
+                       (read-num (str/replace (first (str/split % #"TP")) "Day " "")) %)
+          phases (str/split (first l) #"\t")
+          header (map formatter (str/split (second l) #"\t"))
+          h (count (filter #(not (number? %)) header))
+          formatted-phases (apply conj (map #(hash-map (first %) (second %))
+                                         (filter #(not= "" (first %)) (zipmap (drop h phases) (sort (filter number? header))))))
+          data (map #(str/split % #"\t") (into [] (drop 2 l)))
+          formatted-data (map #(zipmap header %) (filter #(and (>= (count %) h) (not= "" (first %))) data))]
+    {:header header :phases formatted-phases :data formatted-data}))
+(ns taa.core)
+
+(defn replace-demand-and-supply
+  "Load up a marathon workbook and replace the demand records and
+  supply records."
+  [m4-xlsx-path demand-path supp-demand-path out-path workbook-recs
+   default-rc-policy set-demand-params]
+  (let [initial-tables (-> (xl/as-workbook m4-xlsx-path)
+                           (xl/wb->tables))
+        demand-table (->> (tbl/tabdelimited->records demand-path)
+                          (into [])
+                          (concat (taa.core/get-idaho+cannibal-recs
+                                   workbook-recs))
+                          (map set-demand-params)
+                          (taa.core/records->string-name-table))
+        supply-table (taa.core/supply-table workbook-recs default-rc-policy)
+        table-res (merge initial-tables {"DemandRecords" demand-table
+                                         "SupplyRecords" supply-table})]
+    (xl/tables->xlsx out-path table-res)
+        ))
+
+;;Then run rand-runs on this, saving as Excursion_results.txt
+;;then could co-locate a usage.py
+
+(defn do-taa-runs [in-path {:keys [identifier
+                                   resources-root
+                                   phases
+                                   compo-lengths
+                                   reps
+                                   lower
+                                   upper
+                                   threads]}]
+  (let [proj (a/load-project in-path)
+        results
+        (binding [random/*threads* threads]
+          (random/rand-runs proj :reps reps :phases phases :lower lower
+                            :upper upper :compo-lengths
+                            compo-lengths))]
+    (random/write-output (str resources-root "results_" identifier ".txt") results)
+    ))
+
+;;Best way to structure taa inputs?
+;;might use the same timeline, so keep the path specified to that and
+;;the supply demand (so that we don't have to rename supplydemand)
+;;so don't loop over each excursion.
+
+;;look like all literal values, so make one function call (do-taa) in usage
+;;with a map, then I simply need to load-file usage (keep this call
+;;commented in usage and keep an accompanying clj file to call it
+
+
+(defn prep-builder-files
+  "Setup directories and input files for demand builder."
+  [builder-inputs-path
+   workbook-recs
+   outputs-path
+   {:keys [resources-root
+           supp-demand-path
+           vignettes
+           default-rc-policy
+           identifier
+           timeline-name] :as input-map}]
+      ;;setup
+  (io/make-folders! (str builder-inputs-path "/Outputs/"))
+  (taa.core/vignettes-to-file (workbook-recs "SupplyDemand") vignettes
+                              builder-inputs-path)
+  ;;move the timeline to this directory (copy)
+  (copy-file (str resources-root timeline-name) (str builder-inputs-path "timeline.xlsx"))
+  (dj/save-forge supp-demand-path (str outputs-path "FORGE_SE-"
+                                       identifier ".txt"))
+  )
+
+(defn preprocess-taa
+  "Does all of the input preprocessing for taa. Returns the path to
+  the m4 workbook that was generated as a result."
+  [{:keys [resources-root
+           supp-demand-name
+           vignettes
+           default-rc-policy
+           set-demand-params
+           identifier
+           base-m4-name
+           phases
+           compo-lengths
+           reps
+           lower
+           upper
+           threads] :as input-map}]
+  (let [supp-demand-path (str resources-root supp-demand-name)
+        input-map (assoc input-map :supp-demand-path supp-demand-path)
+        base-m4-path (str resources-root base-m4-name)
+        workbook-recs (load-workbook-recs supp-demand-path)
+        builder-inputs-path (str resources-root identifier "_inputs/")
+        outputs-path (str builder-inputs-path "/Outputs/")
+        ;;and place in
+        ;;the Excursion_m4_workbook.xlsx
+        out-path (str resources-root "/m4_book_" identifier
+                      ".xlsx")]
+    ;;setup files for demand builder
+    (prep-builder-files builder-inputs-path workbook-recs
+                        outputs-path input-map)
+    ;;run demand builder
+    (plugin/root->demand-file builder-inputs-path)
+    ;;create a new m4 workbook, replacing the demand and supply worksheets
+    (replace-demand-and-supply base-m4-path (str outputs-path
+                                            "Outputs_DEMAND.txt")
+                               supp-demand-path out-path workbook-recs
+                               default-rc-policy
+                               set-demand-params)
+    out-path
+    ))
+  
+(defn do-taa
+  "Highest level entry point to do a TAA run given a map of input
+  values.  This does both the preprocessing and MARATHON runs."
+  [input-map]
+    (do-taa-runs (preprocess-taa input-map) input-map))
+
 
 ;;supply: search for parent, child relationship
 ;;make a set of SRCs. filter that set such that if the parent
