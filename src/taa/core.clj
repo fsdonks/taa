@@ -337,7 +337,7 @@ xs are records in a tabdelimited table."
 (require 'demand_builder.forgeformatter)
 (ns demand_builder.forgeformatter)
 (defn read-forge [filename]
-  (let [l (str/split (slurp filename) (re-pattern (System/getProperty "line.separator")))
+  (let [l (str/split (slurp filename) #"\n")
         formatter #(if (and (str/includes? % "TP") (str/includes? % "Day"))
                        (read-num (str/replace (first (str/split % #"TP")) "Day " "")) %)
           phases (str/split (first l) #"\t")
