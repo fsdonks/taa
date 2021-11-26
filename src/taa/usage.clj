@@ -32,7 +32,7 @@
                 ;;Assume SRC_By_Day is in SupplyDemand
                 ;;The name of the supply demand file that exists in
                 ;;the resources-root folder
-                :supp-demand-name "SupplyDemand_Colorado.xlsx"
+                :supp-demand-name "SupplyDemand.xlsx"
                 ;;a set of vignettes to keep from SupplyDemand (ensure SupplyDemand
                 ;;has RCAvailable and Idaho)
                 :vignettes #{"AlaskaFwd"
@@ -64,6 +64,7 @@
                                      "Maine2" 2
                                      "Maine3" 2
                                      "SE-Colorado" 4
+                                     "SE-forge2" 4
                                      "Wyoming" 5
                                      "Idaho" 3
                                      "Vermont" 6)
@@ -85,9 +86,15 @@
                                           "Maine2" "NOT-AC"
                                           SourceFirst))))
                 ;;an excursion name to prepend to output files
-                :identifier "Colorado"
+                :identifier "Colorado_single"
+                ;;a map of a labeling of the forge file to the forge
+                ;;xlsx path that contains an SRC_By_Day worksheet.
+                ;;The label string must match the part in timeline
+                ;;after "SE-"
+                :forge-files {"Colorado" "SupplyDemand.xlsx"
+                              "forge2" "another_forge.xlsx"}
                 ;;the name of the the timeline file that exists in resources-path
-                :timeline-name "timeline_Colorado.xlsx"
+                :timeline-name "timeline_test.xlsx"
                 ;;the name of the base marathon file that exists in
                 ;;the resources-path
                 :base-m4-name "base-testdata-v7.xlsx"

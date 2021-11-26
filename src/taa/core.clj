@@ -314,9 +314,10 @@ xs are records in a tabdelimited table."
 
 (defn save-forge
   "Save the src by day worksheet as tab delimited text for demand
-  builder.  Expect SRC_By_Day to be a worksheet in the SupplyDemand workbook."
-  [supp-demand-path out-path]
-  (let [worksheet-rows (->> (load-workbook supp-demand-path)
+  builder.  Expect SRC_By_Day to be a worksheet in the xlsx file
+  located at forege-path."
+  [forge-path out-path]
+  (let [worksheet-rows (->> (load-workbook forge-path)
                             (select-sheet "SRC_By_Day")
                             row-seq
                             (map (fn [x] (if x (cell-seq x))))
@@ -397,8 +398,6 @@ xs are records in a tabdelimited table."
 ;;look like all literal values, so make one function call (do-taa) in usage
 ;;with a map, then I simply need to load-file usage (keep this call
 ;;commented in usage and keep an accompanying clj file to call it
-
-
 (defn prep-builder-files
   "Setup directories and input files for demand builder."
   [builder-inputs-path
@@ -409,15 +408,19 @@ xs are records in a tabdelimited table."
            vignettes
            default-rc-policy
            identifier
-           timeline-name] :as input-map}]
+           timeline-name
+           forge-files] :as input-map}]
       ;;setup
   (io/make-folders! (str builder-inputs-path "/Outputs/"))
   (taa.core/vignettes-to-file (workbook-recs "SupplyDemand") vignettes
                               builder-inputs-path)
   ;;move the timeline to this directory (copy)
-  (copy-file (str resources-root timeline-name) (str builder-inputs-path "timeline.xlsx"))
-  (dj/save-forge supp-demand-path (str outputs-path "FORGE_SE-"
-                                       identifier ".txt"))
+  (copy-file (str resources-root timeline-name) (str
+                                                 builder-inputs-path
+                                                 "timeline.xlsx"))
+  (doseq [[forge-name forge-file-name] forge-files]
+    (dj/save-forge (str resources-root forge-file-name) (str outputs-path "FORGE_SE-"
+                                         forge-name ".txt")))
   )
 
 (defn preprocess-taa
