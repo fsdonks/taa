@@ -93,7 +93,15 @@
                 ;;after "SE-"
                 :forge-files {"Colorado" "SupplyDemand.xlsx"
                               "forge2" "another_forge.xlsx"}
-                ;;the name of the the timeline file that exists in resources-path
+                ;;the name of the the timeline file that exists in
+                ;;resources-path
+                ;;In order to use one timeline file, would need to
+                ;;filter the timeline file based on the forge file
+                ;;map and might also need certain vignettes with one
+                ;;and not the other so would need to specify a
+                ;;vignette filter.  This is too complicated, so just
+                ;;create a timeline.xlsx file for each m4 workbook
+                ;;case for now                
                 :timeline-name "timeline_test.xlsx"
                 ;;the name of the base marathon file that exists in
                 ;;the resources-path
