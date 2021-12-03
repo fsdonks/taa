@@ -29,10 +29,13 @@
                 ;;aren't numbers..... turn stuff to 0s or delete.
                 ;;make sure strength in SRC_By_Day has numbers! if
                 ;;not, set to 0)
-                ;;Assume SRC_By_Day is in SupplyDemand
                 ;;The name of the supply demand file that exists in
-                ;;the resources-root folder
+                ;;the resources-root folder, Must contain a worksheet
+                ;;called "SupplyDemand"
                 :supp-demand-name "SupplyDemand.xlsx"
+                ;;This workbook should only have  one worksheet because it
+                ;;loads the first worksheet it finds.
+                :policy-map-name "rc_war_policy_mapping.xlsx"
                 ;;a set of vignettes to keep from SupplyDemand (ensure SupplyDemand
                 ;;has RCAvailable and Idaho)
                 :vignettes #{"AlaskaFwd"

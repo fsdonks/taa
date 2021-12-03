@@ -428,6 +428,7 @@ xs are records in a tabdelimited table."
   the m4 workbook that was generated as a result."
   [{:keys [resources-root
            supp-demand-name
+           policy-map-name
            vignettes
            default-rc-policy
            set-demand-params
@@ -440,9 +441,13 @@ xs are records in a tabdelimited table."
            upper
            threads] :as input-map}]
   (let [supp-demand-path (str resources-root supp-demand-name)
+        policy-map-path (str resources-root policy-map-name)
         input-map (assoc input-map :supp-demand-path supp-demand-path)
         base-m4-path (str resources-root base-m4-name)
-        workbook-recs (load-workbook-recs supp-demand-path)
+        workbook-recs {"SupplyDemand" ((load-workbook-recs
+                                       supp-demand-path) "SupplyDemand")
+                       "policy_map" (first (vals (load-workbook-recs
+                                       policy-map-path)))}
         builder-inputs-path (str resources-root identifier "_inputs/")
         outputs-path (str builder-inputs-path "/Outputs/")
         ;;and place in
