@@ -8,8 +8,9 @@
 ;;Given a MARATHON project, return the last active day of the period
 ;;named by period
 (defn get-last-day [period proj]
-  (let [last-day (->> (tbl/table-records (:PeriodRecrods proj))
+  (let [last-day (->> (tbl/table-records (:PeriodRecords proj))
                       (filter (fn [r] (= (:Name r) period)))
+                      (first)
                       (:ToDay))]
     ;;Hopefully not nil. Might be "inf"
     last-day))
