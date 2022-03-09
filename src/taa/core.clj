@@ -370,6 +370,81 @@ xs are records in a tabdelimited table."
     (xl/tables->xlsx out-path table-res)
         ))
 
+(require '[marathon.processing.pre :as pre] 
+         '[marathon.ces.core :as core]
+         '[marathon.ces.fill.scope :as scope]
+         '[proc.supply :as supply])
+
+(def zero-results
+  {:rep-seed 0
+ :SRC 0
+ :phase 0
+ :AC-fill 0
+ :NG-fill 0
+ :RC-fill 0
+ :AC-overlap 0
+ :NG-overlap 0
+ :RC-overlap 0
+ :total-quantity 0
+ :AC-deployable 0
+ :NG-deployable 0
+ :RC-deployable 0
+ :AC-not-ready 0
+ :NG-not-ready 0
+ :RC-not-ready 0
+ :AC-total 0
+ :NG-total 0
+ :RC-total 0
+ :AC 0
+ :NG 0
+   :RC 0})
+
+(defn no-demands
+  "Given a marathon project, return a sequence of SRCs that have
+  supply but no demand."
+  [proj]
+  (->> proj
+      (a/load-context)
+      (core/get-fillstore)
+      ((fn [fillstore] (get fillstore :fillgraph)))
+      (scope/derive-scope)
+      (:out-of-scope)
+      (filter (fn [[src reason]] (= "No Demand" reason)))
+      (map first)))
+
+(defn compo-quantities
+  "Return a map of {src {'AC' quantity 'NG' quantity 'RC' quantity} from a marathon project."
+  [proj]
+  (->> proj
+      (:tables)
+      (:SupplyRecords)
+      (tbl/table-records)
+      (supply/quants-by-compo)))
+
+(defn add-no-demand
+  "Given a marathon project, generate results.txt records of all 0s
+  for SRCs that don't have any demand.  These should appear at the top
+  of the 1-n list."
+  [proj reps phases lower upper]
+  (let [quantity-map (compo-quantities proj)]
+            (for [src (no-demands proj)
+        rep (range reps)
+        [p start end] phases
+        :let [compo-map (quantity-map src)
+              ac-quantity (compo-map "AC")
+              [low high]   (random/bound->bounds
+                            ac-quantity [lower upper])]
+        n (if (= low high)
+            [ac-quantity]
+            (random/compute-spread-descending (inc high) low high))]
+    (assoc zero-results
+           :rep-seed rep
+           :SRC src
+           :phase p
+           :AC n
+           :NG (get compo-map "NG" 0)
+           :RC (get compo-map "RC" 0)))))
+
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py
 
@@ -380,15 +455,23 @@ xs are records in a tabdelimited table."
                                    reps
                                    lower
                                    upper
-                                   threads]}]
+                                   threads
+                                   include-no-demand]}]
   (let [proj (a/load-project in-path)
         results
         (binding [random/*threads* threads]
           (random/rand-runs proj :reps reps :phases phases :lower lower
                             :upper upper :compo-lengths
-                            compo-lengths))]
-    (random/write-output (str resources-root "results_" identifier ".txt") results)
-    ))
+                            compo-lengths))
+        results (if include-no-demand (concat results
+                                              (add-no-demand
+                                               proj
+                                               reps
+                                               phases
+                                               lower
+                                               upper))
+                    results)]
+    (random/write-output (str resources-root "results_" identifier ".txt") results)))
 
 ;;Best way to structure taa inputs?
 ;;might use the same timeline, so keep the path specified to that and

@@ -118,13 +118,14 @@
                 ;;compo-lengths for rand-runs               
                 :compo-lengths {"AC" 1 "RC" 2 "NG" 3}
                 ;;usually 30
-                :reps 1
+                :reps 2
                 ;;low bound on AC reductions, usually 0 (no AC inventory)
-                :lower 1
+                :lower 0.9
                 ;;Max ac growth.  usually 1 (base taa inventory)
                 :upper 1
                 ;;20 for taa runs on our 2 fast computers
                 :threads 1
+                :include-no-demand true
                 })
 
 (do-taa input-map)
