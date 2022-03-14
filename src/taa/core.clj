@@ -15,10 +15,10 @@
 ;;utility functions
 (defn columns->records
   "Given a sequenc of records, keep all fields specified by a
-flds sequence and put remaining
-field values into a new column name by k and each remaining
-field key into a column named by fld.
-Assume that each record has the same fields."
+  flds sequence and put remaining
+  field values into a new column name by k and each remaining
+  field key into a column named by fld.
+  Assume that each record has the same fields."
   [recs flds k fld]
   (mapcat (fn [r] (let [baser (select-keys r flds)
                         nfs (apply dissoc r (keys baser))]
@@ -30,13 +30,13 @@ Assume that each record has the same fields."
 
 (defn paste-ordered-records!
   "Pastes a sequence of records, xs, to the clipboard as a string
-that assumes
-xs are records in a tabdelimited table."
+  that assumes
+  xs are records in a tabdelimited table."
   [xs order]
   (board/paste! (tbl/table->tabdelimited (tbl/order-fields-by
-                                            order
-                                            (tbl/records->table
-                                              xs)))))
+                                          order
+                                          (tbl/records->table
+                                           xs)))))
 
 (defn round-to
   "rounds a number, n to an integer number of (num) decimals"
@@ -46,33 +46,33 @@ xs are records in a tabdelimited table."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;demand building tools
 (def nonbog-record (merge conflict-timeline {:Vignette "RC_NonBOG-War"
-                    :Type "DemandRecord"
-                    :Category "NonBOG-RC-Only"
-                    :Overlap 45
-                    :SourceFirst "NOT-AC-MIN"
-                    :Operation "RC_NonBOG-War"
-                    :Enabled "TRUE"
-                    :Demandindex "l"
-                    :Priority 4
-                    (keyword "Title 10_32") 10
-                    :Quantity nil
-                    :SRC nil
-                    :DemandGroup "RC_NonBOG-War"
-                    :OITitle "unnecessary"}))
+                                             :Type "DemandRecord"
+                                             :Category "NonBOG-RC-Only"
+                                             :Overlap 45
+                                             :SourceFirst "NOT-AC-MIN"
+                                             :Operation "RC_NonBOG-War"
+                                             :Enabled "TRUE"
+                                             :Demandindex "l"
+                                             :Priority 4
+                                             (keyword "Title 10_32") 10
+                                             :Quantity nil
+                                             :SRC nil
+                                             :DemandGroup "RC_NonBOG-War"
+                                             :OITitle "unnecessary"}))
 
 (def idaho-record (assoc nonbog-record
-                       :Vignette "Idaho"
-                       :Category "NonBOG"
-                       :Operation "Idaho"
-                       :SourceFirst "NOT-AC-MIN"
-                       :Priority 1
-                       :DemandGroup "Idaho"))
+                         :Vignette "Idaho"
+                         :Category "NonBOG"
+                         :Operation "Idaho"
+                         :SourceFirst "NOT-AC-MIN"
+                         :Priority 1
+                         :DemandGroup "Idaho"))
 
 (defn branch-average [src-unavail]
   (let [groups ( group-by ( fn [[src unavail]] ( subs src 0 2)) src-unavail)]
     ( into {} (map ( fn [ [ group rs] ] 
-                     [ group ( float (/ ( reduce + (map second rs) ) 
-                                        ( count rs) ) ) ] ) groups) ) ) )
+                    [ group ( float (/ ( reduce + (map second rs) ) 
+                                       ( count rs) ) ) ] ) groups) ) ) )
 
 (defn idaho+cannibal-recs 
   [src-rcsupply src-war-idaho src-unavail]
@@ -85,7 +85,7 @@ xs are records in a tabdelimited table."
                :let [unavail-percent (if-let [u (src-unavail src)]
                                        u
                                        (if-let [u (unavail5 (subs
-                                                              src 0 5))]
+                                                             src 0 5))]
                                          u
                                          (if-let [u (averages (subs src 0 2))]
                                            u
@@ -94,14 +94,14 @@ xs are records in a tabdelimited table."
                      diff (- unavail (if-let [h (src-war-idaho src)]
                                        h
                                        0))]]
-               ;(cond
-                 ;(= diff 0) [(assoc idaho-record :Quantity unavail :SRC src)]
-                 
-                 ;(< diff 0) [(assoc idaho-record :Quantity (- unavail
-                  ;                                          diff) :SRC src)]
-                 ;:else [(assoc idaho-record :Quantity (- unavail
-                    ;                                   diff) :SRC src)
-                       ; (assoc nonbog-record :Quantity diff :SRC
+                                        ;(cond
+                                        ;(= diff 0) [(assoc idaho-record :Quantity unavail :SRC src)]
+           
+                                        ;(< diff 0) [(assoc idaho-record :Quantity (- unavail
+                                        ;                                          diff) :SRC src)]
+                                        ;:else [(assoc idaho-record :Quantity (- unavail
+                                        ;                                   diff) :SRC src)
+                                        ; (assoc nonbog-record :Quantity diff :SRC
                                         ;     src)]
            [(assoc idaho-record :Quantity (- unavail diff) :SRC src)
             ;;This changed. This year we are assuming that the unavailable
@@ -109,10 +109,10 @@ xs are records in a tabdelimited table."
             (assoc nonbog-record :Quantity unavail :SRC
                    src)]
            )
-               (reduce concat)
-               (remove (fn [r] (= (:Quantity r) (float 0))))
-               (remove (fn [r] (= (:Quantity r) 0))))))
-                             
+         (reduce concat)
+         (remove (fn [r] (= (:Quantity r) (float 0))))
+         (remove (fn [r] (= (:Quantity r) 0))))))
+
 (def demand-records-root-order
   [:Type
    :Enabled
@@ -136,31 +136,31 @@ xs are records in a tabdelimited table."
 
 (defn get-idaho+cannibal-recs [workbook-recs]
   (let [available-rc (->> (workbook-recs "SupplyDemand")
-                       (reduce (fn [acc {:keys [SRC
-                                                RCAvailable] } ]
-                                 (if (number? RCAvailable)
-                                   (assoc acc SRC RCAvailable)
-                                   acc) ) {}) )
+                          (reduce (fn [acc {:keys [SRC
+                                                   RCAvailable] } ]
+                                    (if (number? RCAvailable)
+                                      (assoc acc SRC RCAvailable)
+                                      acc) ) {}) )
         rc-supply (->> (workbook-recs "SupplyDemand")
-                    (map (fn [{:keys [SRC ARNG USAR]}] [SRC
-                                                        (reduce + (remove nil? [ARNG USAR]))]))
-                    (into {}))
+                       (map (fn [{:keys [SRC ARNG USAR]}] [SRC
+                                                           (reduce + (remove nil? [ARNG USAR]))]))
+                       (into {}))
         rc-unavail (->> (for [[src supply] rc-supply
                               ;;when we have a available number for the src
                               ;;otherwise, this will defer to
                               ;;idaho+cannibal-recs to find unavailable
                               :when (available-rc src)]
                           [src (- 1 (if (zero? supply) 0
-                                      (/ (available-rc src)
-                                         supply)
-                                      ;;stopped.  should just rescan
-                                      )) ])
-                     (into {} ) )
+                                        (/ (available-rc src)
+                                           supply)
+                                        ;;stopped.  should just rescan
+                                        )) ])
+                        (into {} ) )
         src-war-idaho (->> (workbook-recs "SupplyDemand")
-                      (reduce (fn [acc {:keys [SRC Idaho]}]
-                                (assoc acc SRC Idaho)) {})) ]
+                           (reduce (fn [acc {:keys [SRC Idaho]}]
+                                     (assoc acc SRC Idaho)) {})) ]
     (idaho+cannibal-recs rc-supply src-war-idaho rc-unavail)))
-  
+
 (defn get-vignettes
   "Return the vignette table records used for Demand Builder."
   [vignette-recs]
@@ -214,38 +214,38 @@ xs are records in a tabdelimited table."
 (defn supply-table
   "Given" [record-map rc-default-policy]
   (let [rs (->> (record-map "SupplyDemand")
-             (map ( fn [r] ( select-keys r
-                                         [:SRC :UNTDS :RA :ARNG :USAR]))))
+                (map ( fn [r] ( select-keys r
+                               [:SRC :UNTDS :RA :ARNG :USAR]))))
         tblr (->> (columns->records rs
                                     [:SRC :UNTDS] :Quantity :Component)
-               (filter (fn [{:keys [Quantity]}] (and Quantity
-                                                     (not (zero? Quantity))))))
+                  (filter (fn [{:keys [Quantity]}] (and Quantity
+                                                        (not (zero? Quantity))))))
         policy-map (->> (record-map "policy_map") 
-                     (reduce (fn [acc {:keys [SRC
-                                              CompositePolicyName]}]
-                               (assoc acc SRC
-                                      CompositePolicyName)) {}))
+                        (reduce (fn [acc {:keys [SRC
+                                                 CompositePolicyName]}]
+                                  (assoc acc SRC
+                                         CompositePolicyName)) {}))
         policy-map5 ( into {} (map ( fn [ [ s policy] ] [ ( subs s 0 5)
                                                          policy]) policy-map))
         final-recs (for [{:keys [Component SRC] :as r} tblr
                          :let [policy (if-let [p (policy-map
-                                                   SRC)]
+                                                  SRC)]
                                         p
                                         (if-let [p (policy-map5
-                                                     (subs SRC 0 5))]
+                                                    (subs SRC 0 5))]
                                           p
                                           rc-default-policy))]]
                      (assoc
-                       (clojure.set/rename-keys (merge other-fields
-                                                       r) {:UNTDS :OITitle})
-                       :Component (case Component "RA" "AC" "ARNG"
-                                    "NG" "USAR" "RC")
-                       :Policy (if (= Component "RA") "Auto"
-                                   policy) ) ) ]
+                      (clojure.set/rename-keys (merge other-fields
+                                                      r) {:UNTDS :OITitle})
+                      :Component (case Component "RA" "AC" "ARNG"
+                                       "NG" "USAR" "RC")
+                      :Policy (if (= Component "RA") "Auto"
+                                  policy) ) ) ]
     (records->string-name-table final-recs)
-;(paste-ordered-records! final-recs
-;[:Type :Enabled :Quantity :SRC :Component :OITitle :Name
- ;:Behavior :CycleTime :Policy :Tags :Spawntime :Location :Position]
+                                        ;(paste-ordered-records! final-recs
+                                        ;[:Type :Enabled :Quantity :SRC :Component :OITitle :Name
+                                        ;:Behavior :CycleTime :Policy :Tags :Spawntime :Location :Position]
     ))
 
 ;; so the taa dir will have
@@ -254,8 +254,8 @@ xs are records in a tabdelimited table."
 ;;maybe one timeline file?
 
 (defn table->keyword-recs [table]
-    (-> (tbl/keywordize-field-names table)
-       (tbl/table-records)))
+  (-> (tbl/keywordize-field-names table)
+      (tbl/table-records)))
 
 (defn load-workbook-recs
   "Given the path to an Excel workbook, each sheet as records and
@@ -340,14 +340,14 @@ xs are records in a tabdelimited table."
 (defn read-forge [filename]
   (let [l (str/split (slurp filename) #"\n")
         formatter #(if (and (str/includes? % "TP") (str/includes? % "Day"))
-                       (read-num (str/replace (first (str/split % #"TP")) "Day " "")) %)
-          phases (str/split (first l) #"\t")
-          header (map formatter (str/split (second l) #"\t"))
-          h (count (filter #(not (number? %)) header))
-          formatted-phases (apply conj (map #(hash-map (first %) (second %))
-                                         (filter #(not= "" (first %)) (zipmap (drop h phases) (sort (filter number? header))))))
-          data (map #(str/split % #"\t") (into [] (drop 2 l)))
-          formatted-data (map #(zipmap header %) (filter #(and (>= (count %) h) (not= "" (first %))) data))]
+                     (read-num (str/replace (first (str/split % #"TP")) "Day " "")) %)
+        phases (str/split (first l) #"\t")
+        header (map formatter (str/split (second l) #"\t"))
+        h (count (filter #(not (number? %)) header))
+        formatted-phases (apply conj (map #(hash-map (first %) (second %))
+                                          (filter #(not= "" (first %)) (zipmap (drop h phases) (sort (filter number? header))))))
+        data (map #(str/split % #"\t") (into [] (drop 2 l)))
+        formatted-data (map #(zipmap header %) (filter #(and (>= (count %) h) (not= "" (first %))) data))]
     {:header header :phases formatted-phases :data formatted-data}))
 (ns taa.core)
 
@@ -368,7 +368,7 @@ xs are records in a tabdelimited table."
         table-res (merge initial-tables {"DemandRecords" demand-table
                                          "SupplyRecords" supply-table})]
     (xl/tables->xlsx out-path table-res)
-        ))
+    ))
 
 (require '[marathon.processing.pre :as pre] 
          '[marathon.ces.core :as core]
@@ -377,26 +377,26 @@ xs are records in a tabdelimited table."
 
 (def zero-results
   {:rep-seed 0
- :SRC 0
- :phase 0
- :AC-fill 0
- :NG-fill 0
- :RC-fill 0
- :AC-overlap 0
- :NG-overlap 0
- :RC-overlap 0
- :total-quantity 0
- :AC-deployable 0
- :NG-deployable 0
- :RC-deployable 0
- :AC-not-ready 0
- :NG-not-ready 0
- :RC-not-ready 0
- :AC-total 0
- :NG-total 0
- :RC-total 0
- :AC 0
- :NG 0
+   :SRC 0
+   :phase 0
+   :AC-fill 0
+   :NG-fill 0
+   :RC-fill 0
+   :AC-overlap 0
+   :NG-overlap 0
+   :RC-overlap 0
+   :total-quantity 0
+   :AC-deployable 0
+   :NG-deployable 0
+   :RC-deployable 0
+   :AC-not-ready 0
+   :NG-not-ready 0
+   :RC-not-ready 0
+   :AC-total 0
+   :NG-total 0
+   :RC-total 0
+   :AC 0
+   :NG 0
    :RC 0})
 
 (defn no-demands
@@ -404,22 +404,22 @@ xs are records in a tabdelimited table."
   supply but no demand."
   [proj]
   (->> proj
-      (a/load-context)
-      (core/get-fillstore)
-      ((fn [fillstore] (get fillstore :fillgraph)))
-      (scope/derive-scope)
-      (:out-of-scope)
-      (filter (fn [[src reason]] (= "No Demand" reason)))
-      (map first)))
+       (a/load-context)
+       (core/get-fillstore)
+       ((fn [fillstore] (get fillstore :fillgraph)))
+       (scope/derive-scope)
+       (:out-of-scope)
+       (filter (fn [[src reason]] (= "No Demand" reason)))
+       (map first)))
 
 (defn compo-quantities
   "Return a map of {src {'AC' quantity 'NG' quantity 'RC' quantity} from a marathon project."
   [proj]
   (->> proj
-      (:tables)
-      (:SupplyRecords)
-      (tbl/table-records)
-      (supply/quants-by-compo)))
+       (:tables)
+       (:SupplyRecords)
+       (tbl/table-records)
+       (supply/quants-by-compo)))
 
 (defn add-no-demand
   "Given a marathon project, generate results.txt records of all 0s
@@ -427,23 +427,23 @@ xs are records in a tabdelimited table."
   of the 1-n list."
   [proj reps phases lower upper]
   (let [quantity-map (compo-quantities proj)]
-            (for [src (no-demands proj)
-        rep (range reps)
-        [p start end] phases
-        :let [compo-map (quantity-map src)
-              ac-quantity (compo-map "AC")
-              [low high]   (random/bound->bounds
-                            ac-quantity [lower upper])]
-        n (if (= low high)
-            [ac-quantity]
-            (random/compute-spread-descending (inc high) low high))]
-    (assoc zero-results
-           :rep-seed rep
-           :SRC src
-           :phase p
-           :AC n
-           :NG (get compo-map "NG" 0)
-           :RC (get compo-map "RC" 0)))))
+    (for [src (no-demands proj)
+          rep (range reps)
+          [p start end] phases
+          :let [compo-map (quantity-map src)
+                ac-quantity (compo-map "AC")
+                [low high]   (random/bound->bounds
+                              ac-quantity [lower upper])]
+          n (if (= low high)
+              [ac-quantity]
+              (random/compute-spread-descending (inc high) low high))]
+      (assoc zero-results
+             :rep-seed rep
+             :SRC src
+             :phase p
+             :AC n
+             :NG (get compo-map "NG" 0)
+             :RC (get compo-map "RC" 0)))))
 
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py
@@ -493,7 +493,7 @@ xs are records in a tabdelimited table."
            identifier
            timeline-name
            forge-files] :as input-map}]
-      ;;setup
+  ;;setup
   (io/make-folders! (str builder-inputs-path "/Outputs/"))
   (taa.core/vignettes-to-file (workbook-recs "SupplyDemand") vignettes
                               builder-inputs-path)
@@ -503,7 +503,7 @@ xs are records in a tabdelimited table."
                                                  "timeline.xlsx"))
   (doseq [[forge-name forge-file-name] forge-files]
     (dj/save-forge (str resources-root forge-file-name) (str outputs-path "FORGE_SE-"
-                                         forge-name ".txt")))
+                                                             forge-name ".txt")))
   )
 
 (defn preprocess-taa
@@ -528,9 +528,9 @@ xs are records in a tabdelimited table."
         input-map (assoc input-map :supp-demand-path supp-demand-path)
         base-m4-path (str resources-root base-m4-name)
         workbook-recs {"SupplyDemand" ((load-workbook-recs
-                                       supp-demand-path) "SupplyDemand")
+                                        supp-demand-path) "SupplyDemand")
                        "policy_map" (first (vals (load-workbook-recs
-                                       policy-map-path)))}
+                                                  policy-map-path)))}
         builder-inputs-path (str resources-root identifier "_inputs/")
         outputs-path (str builder-inputs-path "/Outputs/")
         ;;and place in
@@ -544,18 +544,18 @@ xs are records in a tabdelimited table."
     (plugin/root->demand-file builder-inputs-path)
     ;;create a new m4 workbook, replacing the demand and supply worksheets
     (replace-demand-and-supply base-m4-path (str outputs-path
-                                            "Outputs_DEMAND.txt")
+                                                 "Outputs_DEMAND.txt")
                                supp-demand-path out-path workbook-recs
                                default-rc-policy
                                set-demand-params)
     out-path
     ))
-  
+
 (defn do-taa
   "Highest level entry point to do a TAA run given a map of input
   values.  This does both the preprocessing and MARATHON runs."
   [input-map]
-    (do-taa-runs (preprocess-taa input-map) input-map))
+  (do-taa-runs (preprocess-taa input-map) input-map))
 
 
 ;;supply: search for parent, child relationship
@@ -572,16 +572,16 @@ xs are records in a tabdelimited table."
   "returns those supply SRCs for which a child exists in the supply also."
   [pc-recs supply-recs]
   (let [p-to-cs (->> (map (juxt :ParentSRC :ChildSRC) pc-recs)
-                  (reduce (fn [acc [p c]] (if (contains? acc p)
-                            (assoc acc p (conj (acc p) c))
-                            (assoc acc p #{c}))) {}))
+                     (reduce (fn [acc [p c]] (if (contains? acc p)
+                                               (assoc acc p (conj (acc p) c))
+                                               (assoc acc p #{c}))) {}))
         enabled-supply (->> supply-recs
-                         (filter (fn [r] (= "TRUE"
-                                            (clojure.string/upper-case (:Enabled r)) )))
-                         (map (fn [r] (:SRC r)))
-                         (into #{}))]
+                            (filter (fn [r] (= "TRUE"
+                                               (clojure.string/upper-case (:Enabled r)) )))
+                            (map (fn [r] (:SRC r)))
+                            (into #{}))]
     (for [s enabled-supply] [s (clojure.set/intersection (p-to-cs
-                                                           s) enabled-supply)])))
+                                                          s) enabled-supply)])))
 
 (defn find-children2
   "given a map where the keys are parents and the values are sets
@@ -593,8 +593,8 @@ of children, find all children for each parent."
      (loop [remaining-children v
             found-children #{}]
        (if (empty? remaining-children)
-        found-children
-        (recur (reduce clojure.set/union (for [c remaining-children] (if-let [res (m c)]
-                                                                                     res #{})))
-                                                                              (clojure.set/union found-children remaining-children))))]))      
-                                                                  
+         found-children
+         (recur (reduce clojure.set/union (for [c remaining-children] (if-let [res (m c)]
+                                                                        res #{})))
+                (clojure.set/union found-children remaining-children))))]))      
+
