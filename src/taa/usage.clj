@@ -10,11 +10,7 @@
 ;;delimited text file, similar to Excel->Save As->tab delimited text
 ;;file in order to save FORGE SRC by day for demand builder.
 (ns taa.core)
-;;need to change these manually right now for the cannibal and idaho
-;;records. This is okay, highlights the fact that there is a separate
-;;pipeline for these just in case we want to go back to assuming
-;;cannibalized units can fill idaho.  For the most recent TAA, we
-;;are currently assuming that cannibalized units can't be used for anything!
+
 (def conflict-timeline {:Duration 969
                         :StartDay 731})
 (load-file "/home/craig/workspace/taa/src/taa/core.clj")
@@ -109,18 +105,25 @@
                 ;;the name of the base marathon file that exists in
                 ;;the resources-path
                 :base-m4-name "base-testdata-v7.xlsx"
+                :periods-name "base-testdata-v7.xlsx"
                 ;;phases for results.txt
                 :phases [["comp" 1 821]
                          ["phase-1" 822 854]
                          ["phase-2" 855 974]
                          ["phase-3" 975 1022]
                          ["phase-4" 1023 1789]]
+                ;;For the most recent TAA, we
+                ;;are currently assuming that cannibalized units can't be used for anything!
+                :cannibal-start "phase-1"
+                :cannibal-end "phase-3"
+                :idaho-start "phase-1"
+                :idaho-end "phase-4"
                 ;;compo-lengths for rand-runs               
                 :compo-lengths {"AC" 1 "RC" 2 "NG" 3}
                 ;;usually 30
                 :reps 2
                 ;;low bound on AC reductions, usually 0 (no AC inventory)
-                :lower 0.9
+                :lower 0.9999
                 ;;Max ac growth.  usually 1 (base taa inventory)
                 :upper 1
                 ;;20 for taa runs on our 2 fast computers

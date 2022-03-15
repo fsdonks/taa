@@ -45,20 +45,20 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;demand building tools
-(def nonbog-record (merge conflict-timeline {:Vignette "RC_NonBOG-War"
-                                             :Type "DemandRecord"
-                                             :Category "NonBOG-RC-Only"
-                                             :Overlap 45
-                                             :SourceFirst "NOT-AC-MIN"
-                                             :Operation "RC_NonBOG-War"
-                                             :Enabled "TRUE"
-                                             :Demandindex "l"
-                                             :Priority 4
-                                             (keyword "Title 10_32") 10
-                                             :Quantity nil
-                                             :SRC nil
-                                             :DemandGroup "RC_NonBOG-War"
-                                             :OITitle "unnecessary"}))
+(def nonbog-record {:Vignette "RC_NonBOG-War"
+                    :Type "DemandRecord"
+                    :Category "NonBOG-RC-Only"
+                    :Overlap 45
+                    :SourceFirst "NOT-AC-MIN"
+                    :Operation "RC_NonBOG-War"
+                    :Enabled "TRUE"
+                    :Demandindex "l"
+                    :Priority 4
+                    (keyword "Title 10_32") 10
+                    :Quantity nil
+                    :SRC nil
+                    :DemandGroup "RC_NonBOG-War"
+                    :OITitle "unnecessary"})
 
 (def idaho-record (assoc nonbog-record
                          :Vignette "Idaho"
@@ -75,8 +75,24 @@
                                        ( count rs) ) ) ] ) groups) ) ) )
 
 (defn idaho+cannibal-recs 
-  [src-rcsupply src-war-idaho src-unavail]
-  (let [unavail5 (into {} (map (fn [ [s unavail]] [ (subs s 0 5)
+  [src-rcsupply src-war-idaho src-unavail {:keys [phases
+                                                  cannibal-start
+                                                  cannibal-end
+                                                  idaho-start
+                                                  idaho-end]}]
+  (let [[_ cannibal-start-t _]
+        (first (filter (fn [[phase-name]]
+                         (= phase-name cannibal-start)) phases))
+        [_ _ cannibal-end-t]
+        (first (filter (fn [[phase-name]]
+                         (= phase-name cannibal-end)) phases))
+        [_ idaho-start-t _]
+        (first (filter (fn [[phase-name]]
+                         (= phase-name idaho-start)) phases))
+        [_ _ idaho-end-t]
+        (first (filter (fn [[phase-name]]
+                         (= phase-name idaho-end)) phases))
+        unavail5 (into {} (map (fn [ [s unavail]] [ (subs s 0 5)
                                                    unavail]) src-unavail))
         averages (branch-average src-unavail)
         average (float (/ (reduce + (map second src-unavail))
@@ -103,11 +119,18 @@
                                         ;                                   diff) :SRC src)
                                         ; (assoc nonbog-record :Quantity diff :SRC
                                         ;     src)]
-           [(assoc idaho-record :Quantity (- unavail diff) :SRC src)
+           [(assoc idaho-record
+                   :Quantity (- unavail diff)
+                   :SRC src
+                   :StartDay idaho-start-t
+                   :Duration (inc (- idaho-end-t idaho-start-t)))
             ;;This changed. This year we are assuming that the unavailable
             ;;number cannot be used for idaho.
-            (assoc nonbog-record :Quantity unavail :SRC
-                   src)]
+            (assoc nonbog-record
+                   :Quantity unavail
+                   :SRC src
+                   :StartDay cannibal-start-t
+                   :Duration (inc (- cannibal-end-t cannibal-start-t)))]
            )
          (reduce concat)
          (remove (fn [r] (= (:Quantity r) (float 0))))
@@ -134,7 +157,7 @@
        (tbl/stringify-field-names)
        ))
 
-(defn get-idaho+cannibal-recs [workbook-recs]
+(defn get-idaho+cannibal-recs [workbook-recs input-map]
   (let [available-rc (->> (workbook-recs "SupplyDemand")
                           (reduce (fn [acc {:keys [SRC
                                                    RCAvailable] } ]
@@ -159,7 +182,7 @@
         src-war-idaho (->> (workbook-recs "SupplyDemand")
                            (reduce (fn [acc {:keys [SRC Idaho]}]
                                      (assoc acc SRC Idaho)) {})) ]
-    (idaho+cannibal-recs rc-supply src-war-idaho rc-unavail)))
+    (idaho+cannibal-recs rc-supply src-war-idaho rc-unavail input-map)))
 
 (defn get-vignettes
   "Return the vignette table records used for Demand Builder."
@@ -355,18 +378,21 @@
   "Load up a marathon workbook and replace the demand records and
   supply records."
   [m4-xlsx-path demand-path supp-demand-path out-path workbook-recs
-   default-rc-policy set-demand-params]
+   default-rc-policy set-demand-params periods-path input-map]
   (let [initial-tables (-> (xl/as-workbook m4-xlsx-path)
                            (xl/wb->tables))
+        period-table ((-> (xl/as-workbook periods-path)
+                           (xl/wb->tables)) "PeriodRecords")
         demand-table (->> (tbl/tabdelimited->records demand-path)
                           (into [])
                           (concat (taa.core/get-idaho+cannibal-recs
-                                   workbook-recs))
+                                   workbook-recs input-map))
                           (map set-demand-params)
                           (taa.core/records->string-name-table))
         supply-table (taa.core/supply-table workbook-recs default-rc-policy)
         table-res (merge initial-tables {"DemandRecords" demand-table
-                                         "SupplyRecords" supply-table})]
+                                         "SupplyRecords" supply-table
+                                         "PeriodRecords" period-table})]
     (xl/tables->xlsx out-path table-res)
     ))
 
@@ -522,7 +548,8 @@
            reps
            lower
            upper
-           threads] :as input-map}]
+           threads
+           periods-name] :as input-map}]
   (let [supp-demand-path (str resources-root supp-demand-name)
         policy-map-path (str resources-root policy-map-name)
         input-map (assoc input-map :supp-demand-path supp-demand-path)
@@ -547,7 +574,9 @@
                                                  "Outputs_DEMAND.txt")
                                supp-demand-path out-path workbook-recs
                                default-rc-policy
-                               set-demand-params)
+                               set-demand-params
+                               (str resources-root periods-name)
+                               input-map)
     out-path
     ))
 
