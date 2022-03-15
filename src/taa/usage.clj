@@ -106,6 +106,7 @@
                 ;;the resources-path
                 :base-m4-name "base-testdata-v7.xlsx"
                 :periods-name "base-testdata-v7.xlsx"
+                :parameters-name "base-testdata-v7.xlsx"
                 ;;phases for results.txt
                 :phases [["comp" 1 821]
                          ["phase-1" 822 854]
