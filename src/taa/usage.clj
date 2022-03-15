@@ -11,8 +11,6 @@
 ;;file in order to save FORGE SRC by day for demand builder.
 (ns taa.core)
 
-(def conflict-timeline {:Duration 969
-                        :StartDay 731})
 (load-file "/home/craig/workspace/taa/src/taa/core.clj")
 
 (def input-map {:resources-root "/home/craig/workspace/taa/resources/"
