@@ -378,11 +378,13 @@
   "Load up a marathon workbook and replace the demand records and
   supply records."
   [m4-xlsx-path demand-path supp-demand-path out-path workbook-recs
-   default-rc-policy set-demand-params periods-path input-map]
+   default-rc-policy set-demand-params periods-path parameters-path input-map]
   (let [initial-tables (-> (xl/as-workbook m4-xlsx-path)
                            (xl/wb->tables))
         period-table ((-> (xl/as-workbook periods-path)
-                           (xl/wb->tables)) "PeriodRecords")
+                          (xl/wb->tables)) "PeriodRecords")
+        parameter-table ((-> (xl/as-workbook parameters-path)
+                          (xl/wb->tables)) "Parameters")
         demand-table (->> (tbl/tabdelimited->records demand-path)
                           (into [])
                           (concat (taa.core/get-idaho+cannibal-recs
@@ -392,7 +394,8 @@
         supply-table (taa.core/supply-table workbook-recs default-rc-policy)
         table-res (merge initial-tables {"DemandRecords" demand-table
                                          "SupplyRecords" supply-table
-                                         "PeriodRecords" period-table})]
+                                         "PeriodRecords" period-table
+                                         "Parameters" parameter-table})]
     (xl/tables->xlsx out-path table-res)
     ))
 
@@ -549,7 +552,8 @@
            lower
            upper
            threads
-           periods-name] :as input-map}]
+           periods-name
+           parameters-name] :as input-map}]
   (let [supp-demand-path (str resources-root supp-demand-name)
         policy-map-path (str resources-root policy-map-name)
         input-map (assoc input-map :supp-demand-path supp-demand-path)
@@ -576,6 +580,7 @@
                                default-rc-policy
                                set-demand-params
                                (str resources-root periods-name)
+                               (str resources-root parameters-name)
                                input-map)
     out-path
     ))
