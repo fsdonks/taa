@@ -384,7 +384,7 @@
         period-table ((-> (xl/as-workbook periods-path)
                           (xl/wb->tables)) "PeriodRecords")
         parameter-table ((-> (xl/as-workbook parameters-path)
-                          (xl/wb->tables)) "Parameters")
+                             (xl/wb->tables)) "Parameters")
         demand-table (->> (tbl/tabdelimited->records demand-path)
                           (into [])
                           (concat (taa.core/get-idaho+cannibal-recs
@@ -619,7 +619,7 @@
 
 (defn find-children2
   "given a map where the keys are parents and the values are sets
-of children, find all children for each parent."
+  of children, find all children for each parent."
   [m]
   (for [ [k v] m]
     [k
