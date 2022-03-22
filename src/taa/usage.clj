@@ -1,18 +1,8 @@
-;;meant to be loaded from the marathon repl and contains inputs that
-;;will be frequently toggled for doing taa runs.
-
-;;To use the latest version of docjure with MARATHON, you need to put
-;;the dependency [dk.ative/docjure "1.16.0"] in the m4 project.clj.
-;;Used docjure proper instead of spork.util.excel.docjure because
-;;the latest version returns nil for blank cells.  blank cells were
-;;filtered out in older versions.  This allows us to copy  the data as
-;;is from an xlsx worksheet and then copy the same data to a tab
-;;delimited text file, similar to Excel->Save As->tab delimited text
-;;file in order to save FORGE SRC by day for demand builder.
-(ns taa.core)
-
-(load-file "/home/craig/workspace/taa/src/taa/core.clj")
-
+;;All of this code is meant to be loaded from taa.core and contains
+;;inputs that will be frequently toggled for doing taa runs.
+;;Once you have a repl going in taa.core, to run the code here, just
+;;call
+;;(load-file "/home/craig/workspace/taa/src/taa/usage.clj")
 (def input-map {:resources-root "/home/craig/workspace/taa/resources/"
                 ;;;;;;what usage.clj should be specifying:
                 ;;path to SupplyDemand (also has a policy_map worksheet)
