@@ -7,7 +7,7 @@
 ;;Once you have a repl going in taa.core, to run the code here, just
 ;;call
 ;;(load-file "/home/craig/workspace/taa/src/taa/usage.clj")
-(def input-map {:resources-root "resources/"
+(def input-map {:resources-root "test/resources/"
                 ;;;;;;what usage.clj should be specifying:
                 ;;path to SupplyDemand (also has a policy_map worksheet)
                 ;; no matching clause exceptions might be for N/As in excel formulas

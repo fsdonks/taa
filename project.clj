@@ -19,10 +19,14 @@
   ;;includes all dependencies by calling
   ;;lein with-profile uberjar capsule
   ;;from this repo
-  :profiles {:uberjar {:aot [taa.main]
+  :profiles {:dev {:resource-paths ["test/resources"]}
+             :uberjar {:aot [taa.main]
                        :main  taa.main
                        :jvm-opts ^:replace ["-Xmx1000m" "-XX:NewSize=200m" "-server"]
                        :plugins [[lein-capsule "0.2.1"]]
+                       ;;put the test dir in here so we can run tests from the capsule
+                       :source-paths ["src" "test"]
+                       :resource-paths ["test/resources"]
                        }}
   ;;default is thin.  This should include all dependencies in the capsule.
   :capsule {:types {:fat {}}

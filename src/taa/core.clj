@@ -275,16 +275,36 @@
 ;;a supply demand workbook for each demand
 ;;and forge output for each demand
 ;;maybe one timeline file?
-
 (defn table->keyword-recs [table]
   (-> (tbl/keywordize-field-names table)
       (tbl/table-records)))
 
+(defn in-uberjar?
+  "Determines if we are running inside an uberjar or not.  This seems
+  to work and returns true from MARATHON and the taa uberjar.  This
+  will return false if loading a repl from a project using Nightcode
+  or when cider jacking in to a project."
+  []
+  (= *file* "NO_SOURCE_PATH"))
+
+(defn as-workbook
+  "Loads an Excel workbook from the filepath.  If we are within an
+  uberjar, check for the filename in resources in order to load it."
+  [filepath]
+  (println filepath)
+  (println "in-uberjar? is " (in-uberjar?))
+  (println *file*)
+  ;(if (in-uberjar?)
+    (dj/load-workbook-from-resource (io/fname filepath))
+  ;(xl/as-workbook filepath))
+  )
+
+  
 (defn load-workbook-recs
   "Given the path to an Excel workbook, each sheet as records and
   return a map of sheetname to records."
   [path]
-  (->> (xl/as-workbook path)
+  (->> (as-workbook path)
        (xl/wb->tables)
        (reduce-kv (fn [acc sheet-name table]
                     (assoc acc sheet-name (table->keyword-recs
@@ -293,6 +313,11 @@
 
 (defn copy-file [source-path dest-path]
   (java.io/copy (java.io/file source-path) (java.io/file dest-path)))
+
+(defn copy-resource! [resource-filename new-dir]
+  (let [resource-file (java.io/resource resource-filename)
+        tmp-file (java.io/file new-dir resource-filename)]
+    (with-open [in (java.io/input-stream resource-file)] (java.io/copy in tmp-file))))
 
 ;;save the SRC_by_day worksheet as tab delimitted text for demand
 ;;builder
