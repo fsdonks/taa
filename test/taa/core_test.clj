@@ -2,12 +2,17 @@
   (:require [clojure.test :refer :all]
             [taa.core :refer :all]))
 
-;;All of this code is meant to be loaded from taa.core and contains
-;;inputs that will be frequently toggled for doing taa runs.
-;;Once you have a repl going in taa.core, to run the code here, just
-;;call
-;;(load-file "/home/craig/workspace/taa/src/taa/usage.clj")
-(def input-map {:resources-root "test/resources/"
+;;To do runs, you would load an input map in taa.core and call do-taa
+;;without deftest.
+
+(def input-map {;;Only need to set this to true if the filenames are
+                ;;going to be located as resources on the path.
+                ;;If using resources, the initial inputs are
+                ;;resources, and intermediate and final inputs/outputs
+                ;;will be in the jar folder under the recources-root.
+                :testing? true
+                ;;A place for non-resource inputs and the outputs.
+                :resources-root "test-output/"
                 ;;;;;;what usage.clj should be specifying:
                 ;;path to SupplyDemand (also has a policy_map worksheet)
                 ;; no matching clause exceptions might be for N/As in excel formulas

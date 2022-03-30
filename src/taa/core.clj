@@ -11,6 +11,10 @@
             [demand_builder.m4plugin :as plugin]
             [marathon.analysis.random :as random]
             [marathon.analysis :as a]))
+
+;;indicate that we should load resources from the jar as opposed to
+;;the file system
+(def ^:dynamic *testing?* false)
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;utility functions
 (defn columns->records
@@ -288,16 +292,11 @@
   (= *file* "NO_SOURCE_PATH"))
 
 (defn as-workbook
-  "Loads an Excel workbook from the filepath.  If we are within an
-  uberjar, check for the filename in resources in order to load it."
+  "Loads an Excel workbook from resources if we are running tests, or loads the workbooks from filepath."
   [filepath]
-  (println filepath)
-  (println "in-uberjar? is " (in-uberjar?))
-  (println *file*)
-  ;(if (in-uberjar?)
-    (dj/load-workbook-from-resource (io/fname filepath))
-  ;(xl/as-workbook filepath))
-  )
+  (if *testing?*
+    (dj/load-workbook-from-resource filepath)
+    (xl/as-workbook filepath)))
 
   
 (defn load-workbook-recs
@@ -365,7 +364,9 @@
   builder.  Expect SRC_By_Day to be a worksheet in the xlsx file
   located at forege-path."
   [forge-path out-path]
-  (let [worksheet-rows (->> (load-workbook forge-path)
+  (let [worksheet-rows (->> (if taa.core/*testing?* (load-workbook-from-resource
+                                           forge-path)
+                                (load-workbook forge-path))
                             (select-sheet "SRC_By_Day")
                             row-seq
                             (map (fn [x] (if x (cell-seq x))))
@@ -404,11 +405,11 @@
   supply records."
   [m4-xlsx-path demand-path supp-demand-path out-path workbook-recs
    default-rc-policy set-demand-params periods-path parameters-path input-map]
-  (let [initial-tables (-> (xl/as-workbook m4-xlsx-path)
+  (let [initial-tables (-> (as-workbook m4-xlsx-path)
                            (xl/wb->tables))
-        period-table ((-> (xl/as-workbook periods-path)
+        period-table ((-> (as-workbook periods-path)
                           (xl/wb->tables)) "PeriodRecords")
-        parameter-table ((-> (xl/as-workbook parameters-path)
+        parameter-table ((-> (as-workbook parameters-path)
                              (xl/wb->tables)) "Parameters")
         demand-table (->> (tbl/tabdelimited->records demand-path)
                           (into [])
@@ -552,13 +553,17 @@
   (taa.core/vignettes-to-file (workbook-recs "SupplyDemand") vignettes
                               builder-inputs-path)
   ;;move the timeline to this directory (copy)
-  (copy-file (str resources-root timeline-name) (str
-                                                 builder-inputs-path
-                                                 "timeline.xlsx"))
-  (doseq [[forge-name forge-file-name] forge-files]
-    (dj/save-forge (str resources-root forge-file-name) (str outputs-path "FORGE_SE-"
-                                                             forge-name ".txt")))
-  )
+  (if *testing?*
+    (copy-resource! timeline-name builder-inputs-path)
+    (copy-file (str resources-root timeline-name) (str
+                                                   builder-inputs-path
+                                                   "timeline.xlsx")))
+  (doseq [[forge-name forge-file-name] forge-files
+          :let [in-path (if *testing?*
+                          forge-file-name
+                          (str resources-root forge-file-name))]]
+          (dj/save-forge in-path (str outputs-path "FORGE_SE-"
+                                      forge-name ".txt"))))
 
 (defn preprocess-taa
   "Does all of the input preprocessing for taa. Returns the path to
@@ -579,10 +584,11 @@
            threads
            periods-name
            parameters-name] :as input-map}]
-  (let [supp-demand-path (str resources-root supp-demand-name)
-        policy-map-path (str resources-root policy-map-name)
+  (let [in-root (if *testing?* "" resources-root)
+        supp-demand-path (str in-root supp-demand-name)
+        policy-map-path (str in-root policy-map-name)
         input-map (assoc input-map :supp-demand-path supp-demand-path)
-        base-m4-path (str resources-root base-m4-name)
+        base-m4-path (str in-root base-m4-name)
         workbook-recs {"SupplyDemand" ((load-workbook-recs
                                         supp-demand-path) "SupplyDemand")
                        "policy_map" (first (vals (load-workbook-recs
@@ -604,8 +610,8 @@
                                supp-demand-path out-path workbook-recs
                                default-rc-policy
                                set-demand-params
-                               (str resources-root periods-name)
-                               (str resources-root parameters-name)
+                               (str in-root periods-name)
+                               (str in-root parameters-name)
                                input-map)
     out-path
     ))
@@ -613,8 +619,9 @@
 (defn do-taa
   "Highest level entry point to do a TAA run given a map of input
   values.  This does both the preprocessing and MARATHON runs."
-  [input-map]
-  (do-taa-runs (preprocess-taa input-map) input-map))
+  [{:keys [testing?] :as input-map}]
+  (binding [*testing?* testing?]
+    (do-taa-runs (preprocess-taa input-map) input-map)))
 
 
 ;;supply: search for parent, child relationship
