@@ -19,7 +19,8 @@
   ;;includes all dependencies by calling
   ;;lein with-profile uberjar capsule
   ;;from this repo
-  :profiles {:dev {:resource-paths ["test/resources"]}
+  :profiles {;;load our tests from resources just like in the uberjar
+             :dev {:resource-paths ["test/resources"]}
              :uberjar {:aot [taa.main]
                        :main  taa.main
                        :jvm-opts ^:replace ["-Xmx1000m" "-XX:NewSize=200m" "-server"]

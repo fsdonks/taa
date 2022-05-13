@@ -64,13 +64,14 @@
                     :DemandGroup "RC_NonBOG-War"
                     :OITitle "unnecessary"})
 
-(def idaho-record (assoc nonbog-record
-                         :Vignette "Idaho"
+(defn idaho-record [name]
+  (assoc nonbog-record
+                         :Vignette name
                          :Category "NonBOG"
-                         :Operation "Idaho"
+                         :Operation name
                          :SourceFirst "NOT-AC-MIN"
                          :Priority 1
-                         :DemandGroup "Idaho"))
+                         :DemandGroup name))
 
 (defn branch-average [src-unavail]
   (let [groups ( group-by ( fn [[src unavail]] ( subs src 0 2)) src-unavail)]
@@ -83,7 +84,8 @@
                                                   cannibal-start
                                                   cannibal-end
                                                   idaho-start
-                                                  idaho-end]}]
+                                                  idaho-end
+                                                  idaho-name]}]
   (let [[_ cannibal-start-t _]
         (first (filter (fn [[phase-name]]
                          (= phase-name cannibal-start)) phases))
@@ -123,7 +125,7 @@
                                         ;                                   diff) :SRC src)
                                         ; (assoc nonbog-record :Quantity diff :SRC
                                         ;     src)]
-           [(assoc idaho-record
+           [(assoc (idaho-record idaho-name)
                    :Quantity (- unavail diff)
                    :SRC src
                    :StartDay idaho-start-t
@@ -161,7 +163,7 @@
        (tbl/stringify-field-names)
        ))
 
-(defn get-idaho+cannibal-recs [workbook-recs input-map]
+(defn get-idaho+cannibal-recs [workbook-recs {:keys [idaho-name] :as input-map}]
   (let [available-rc (->> (workbook-recs "SupplyDemand")
                           (reduce (fn [acc {:keys [SRC
                                                    RCAvailable] } ]
@@ -184,8 +186,8 @@
                                         )) ])
                         (into {} ) )
         src-war-idaho (->> (workbook-recs "SupplyDemand")
-                           (reduce (fn [acc {:keys [SRC Idaho]}]
-                                     (assoc acc SRC Idaho)) {})) ]
+                           (reduce (fn [acc {:keys [SRC] :as r}]
+                                     (assoc acc SRC (get r (keyword idaho-name)))) {})) ]
     (idaho+cannibal-recs rc-supply src-war-idaho rc-unavail input-map)))
 
 (defn get-vignettes

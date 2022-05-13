@@ -116,6 +116,8 @@
                 :cannibal-end "phase-3"
                 :idaho-start "phase-1"
                 :idaho-end "phase-4"
+                ;;This name will change when we move the repo.
+                :idaho-name "Idaho"
                 ;;compo-lengths for rand-runs               
                 :compo-lengths {"AC" 1 "RC" 2 "NG" 3}
                 ;;usually 30
