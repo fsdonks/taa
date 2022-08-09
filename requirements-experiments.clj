@@ -2,7 +2,10 @@
   (:require [marathon.analysis.requirements.sensitivity :as snt]
             ;;marathon.analysis.tacmm.demo has stuff for updating parameters
             [marathon.analysis.tacmm.demo :as demo]
-            [spork.util [io :as io] [table :as tbl]]))
+            [spork.util [io :as io]
+             [table :as tbl]]
+            [spork.util.excel.core :as xl]
+            ))
 		
 ;;LastDayDefault indicates the last processed day of the simulation.
 ;;Given a MARATHON project, return the last active day of the period
@@ -35,13 +38,13 @@
   [out-dir]
   (spit (str out-dir "cost.txt") "src\ttotal_cost"))
 
-(def add-supply-strength
+(defn add-supply-strength
   "Add a Strength field to the supply records in a MARATHON workbook
   and spit out the new workbook."
   [])
 
 
-(def save-supply
+(defn save-supply
   "Save supply records."
   [in-paths out-dir]
   )
@@ -63,6 +66,8 @@
 ;;creates text files in out-dir named by wkbk_name-periodname-bound.txt
 (defn stop-after-periods
   [in-paths period-names missed-days out-dir contour-fn]
+  ;;create our output folder if it doesn't exist.
+  (io/make-folders! out-dir)
   (let [input-recs (for [path in-paths
                          period period-names                         
                          [bound recs]

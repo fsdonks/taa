@@ -5,12 +5,12 @@
 ;;easiest way to accoutn for both demands is  to concatenate both demandrecords for COMFORTER
 
 (load-file
- "/home/craig/workspace/requirements-experiments/requirements-experiments.clj")
+ "/home/craig/workspace/taa/requirements-experiments.clj")
 
 (ns requirements-experiments)
 
 (def resource-root
-  "/home/craig/workspace/requirements-experiments/resources/")
+  "/home/craig/workspace/taa/resources/")
 
 ;;before someone made separate notebooks for stopping after periods, I was going to use,
 
