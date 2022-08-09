@@ -27,16 +27,36 @@
       ;;this is the last period, so we don't to change the end day
       identity
       (change-last-day period proj last-day))))
-			
-;;better way to run multiple demands is have no DemandRecords or
-;;SupplyRecords in MARATHON workbook and then pull each demand
-;;output from TAA builder as opposed to multiple m4 workbooks for each
-;;demand.  There could be two workbooks, one
-;;with all demandrecords titled by a name and the other with all
-;;supplyrecords titled by name then runs are defined in [supply-name
-;;demand-name] tuples given the a vector of paths to MARATHON
-;;workbooks along with a vector of period names to stop the simulation
-;;after and a vector of contiguous missed demand days.
+
+(defn blank-cost-file
+  "Just writes a blank cost file to the comforter inputs folder since
+  this is needed to comforter but we don't consider monetary cost
+  anymore for requirements analysis."
+  [out-dir]
+  (spit (str out-dir "cost.txt") "src\ttotal_cost"))
+
+(def add-supply-strength
+  "Add a Strength field to the supply records in a MARATHON workbook
+  and spit out the new workbook."
+  [])
+
+
+(def save-supply
+  "Save supply records."
+  [in-paths out-dir]
+  )
+
+(defn prep-for-requirements
+  "Take the path to a marathon workbook and prep the workbook for
+  requirements analysis. Save the workbook with changes."
+  [m4-xlsx-path]
+  (let [;;stopped here, started looking to fix project dependencies.  
+        initial-tables (-> (xl/as-workbook m4-xlsx-path)
+                           (xl/wb->tables))
+        proportion-table (initial-tables "DemandRecords")
+        supply-table (initial-tables "SupplyRecords")]
+
+    ))
 
 ;;expect the same periods between workbooks For COMORTER, we'll output
 ;;our results in individual text files.
@@ -58,4 +78,5 @@
                      ;;write the output for comforter
                      (do (tbl/records->file recs file-path )
                          {:Case case :Filepath file-path}))]
-    (tbl/records->file input-recs (str out-dir "input.txt"))))
+    (tbl/records->file input-recs (str out-dir "input.txt"))
+    (blank-cost-file out-dir)))
