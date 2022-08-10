@@ -1,6 +1,6 @@
 ;;This namespace is used to preprocess TAA inputs and do TAA runs
 ;;using inputs like those specified in the accompanying usage.clj.
-(ns taa.core
+(ns taa.capacity
   (:require [spork.util.table :as tbl]
             [spork.util.clipboard :as board]
             [clojure.java.io :as java.io]
@@ -366,7 +366,7 @@
   builder.  Expect SRC_By_Day to be a worksheet in the xlsx file
   located at forege-path."
   [forge-path out-path]
-  (let [worksheet-rows (->> (if taa.core/*testing?* (load-workbook-from-resource
+  (let [worksheet-rows (->> (if taa.capacity/*testing?* (load-workbook-from-resource
                                            forge-path)
                                 (load-workbook forge-path))
                             (select-sheet "SRC_By_Day")
@@ -382,7 +382,7 @@
                             (reduce str))]
     (spit out-path worksheet-rows :append false)))
 
-(ns taa.core)   
+(ns taa.capacity)   
 
 ;;Take demand builder output and post process the demand
 ;;I think this is it...
@@ -400,7 +400,7 @@
         data (map #(str/split % #"\t") (into [] (drop 2 l)))
         formatted-data (map #(zipmap header %) (filter #(and (>= (count %) h) (not= "" (first %))) data))]
     {:header header :phases formatted-phases :data formatted-data}))
-(ns taa.core)
+(ns taa.capacity)
 
 (defn replace-demand-and-supply
   "Load up a marathon workbook and replace the demand records and
@@ -415,11 +415,11 @@
                              (xl/wb->tables)) "Parameters")
         demand-table (->> (tbl/tabdelimited->records demand-path)
                           (into [])
-                          (concat (taa.core/get-idaho+cannibal-recs
+                          (concat (taa.capacity/get-idaho+cannibal-recs
                                    workbook-recs input-map))
                           (map set-demand-params)
-                          (taa.core/records->string-name-table))
-        supply-table (taa.core/supply-table workbook-recs default-rc-policy)
+                          (taa.capacity/records->string-name-table))
+        supply-table (taa.capacity/supply-table workbook-recs default-rc-policy)
         table-res (merge initial-tables {"DemandRecords" demand-table
                                          "SupplyRecords" supply-table
                                          "PeriodRecords" period-table
@@ -552,7 +552,7 @@
            forge-files] :as input-map}]
   ;;setup
   (io/make-folders! (str builder-inputs-path "/Outputs/"))
-  (taa.core/vignettes-to-file (workbook-recs "SupplyDemand") vignettes
+  (taa.capacity/vignettes-to-file (workbook-recs "SupplyDemand") vignettes
                               builder-inputs-path)
   ;;move the timeline to this directory (copy)
   (if *testing?*

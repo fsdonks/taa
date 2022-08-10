@@ -1,6 +1,6 @@
-(ns taa.core-test
+(ns taa.capacity-test
   (:require [clojure.test :refer :all]
-            [taa.core :refer :all]))
+            [taa.capacity :as capacity]))
 
 ;;To do runs, you would load an input map in taa.core and call do-taa
 ;;without deftest.
@@ -131,10 +131,10 @@
                 :include-no-demand true
                 })
 
-(deftest capacity
+(deftest capacity-check
     (testing "Just checking if highest level taa function completes
     for capacity analysis preprocessing and runs."
-      (do-taa input-map)))
+      (capacity/do-taa input-map)))
 
 ;;if you want preprocess first and then visually check, call
 ;;preprocess-taa first and then call do-taa-runs on the output
