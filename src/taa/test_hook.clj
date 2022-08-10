@@ -1,3 +1,3 @@
 (ns test-hook
-	(:require [taa.core-test]))
-(clojure.test/run-tests 'taa.core-test)
+	(:require [taa.capacity-test]))
+(clojure.test/run-tests 'taa.capacity-test)
