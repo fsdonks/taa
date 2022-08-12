@@ -5,7 +5,7 @@
 ;;easiest way to accoutn for both demands is  to concatenate both demandrecords for COMFORTER
 
 (load-file
- "/home/craig/workspace/taa/requirements-experiments.clj")
+ "/home/craig/workspace/taa/src/requirements.clj")
 
 (ns requirements-experiments)
 
