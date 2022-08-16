@@ -17,6 +17,8 @@
 (def input-paths [
 (str resource-root "base-testdata-v7.xlsx")
 (str resource-root "testdata-v7-bog.xlsx")
+(str resource-root "forward_tagged.xlsx")
+(str resource-root "forward_not-tagged.xlsx")
 ])
 
 ;;3 cases: the entire demand, through ph4, and through ph3

@@ -13,7 +13,7 @@
                  [dk.ative/docjure "1.16.0"]
                  ;;currently, marathon is not pushed to clojars to
                  ;;need to lein install from the marathon repo first
-                 [marathon "4.2.3-SNAPSHOT"]]
+                 [marathon "4.2.4-SNAPSHOT"]]
   :repl-options {:init-ns taa.core}
   ;;This stuff below will allow us to build a runnable jar that
   ;;includes all dependencies by calling

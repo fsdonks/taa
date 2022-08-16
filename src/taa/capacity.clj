@@ -240,8 +240,31 @@
    :Location "Auto",
    :position "Auto"})
 
+(defn forward-quantities
+  "Returns a map of SRC to the forward stationed quantity."
+  [record-map forward-name]
+    (->> (record-map "SupplyDemand")
+         (reduce (fn [acc {:keys [SRC] :as r} ]
+                   (let [quantity (r (keyword forward-name))]
+                     (if (and (number?
+                               quantity)
+                              (not
+                               (zero?
+                                quantity)))                                      
+                       (assoc acc SRC (int quantity))
+                       acc) )) {}) ))
+
+(defn tag-demand
+  "Return a tag for all demands.  Currently only binning the forward
+  stationed units."
+  [compo src forward-nums forward-name]
+  (let [forward-num (forward-nums src)]
+    (if (and (= compo "RA") (not (nil? forward-num)))
+      (str "{:preprocess [align-units [[:"
+           forward-name " " forward-num "]]]}"))))
+
 (defn supply-table
-  "Given" [record-map rc-default-policy]
+  "Given" [record-map rc-default-policy input-map]
   (let [rs (->> (record-map "SupplyDemand")
                 (map ( fn [r] ( select-keys r
                                [:SRC :UNTDS :RA :ARNG :USAR]))))
@@ -255,7 +278,10 @@
                                   (assoc acc SRC
                                          CompositePolicyName)) {}))
         policy-map5 ( into {} (map ( fn [ [ s policy] ] [ ( subs s 0 5)
-                                                         policy]) policy-map))
+                                                         policy])
+                                   policy-map))
+        forward-name (:forward-name input-map)
+        forward-nums (forward-quantities record-map forward-name)
         final-recs (for [{:keys [Component SRC] :as r} tblr
                          :let [policy (if-let [p (policy-map
                                                   SRC)]
@@ -270,7 +296,8 @@
                       :Component (case Component "RA" "AC" "ARNG"
                                        "NG" "USAR" "RC")
                       :Policy (if (= Component "RA") "Auto"
-                                  policy) ) ) ]
+                                  policy)
+                      :Tags  (tag-demand Component SRC forward-nums forward-name)))]
     (records->string-name-table final-recs)
                                         ;(paste-ordered-records! final-recs
                                         ;[:Type :Enabled :Quantity :SRC :Component :OITitle :Name
@@ -419,7 +446,8 @@
                                    workbook-recs input-map))
                           (map set-demand-params)
                           (taa.capacity/records->string-name-table))
-        supply-table (taa.capacity/supply-table workbook-recs default-rc-policy)
+        supply-table (taa.capacity/supply-table workbook-recs
+                                                default-rc-policy input-map)
         table-res (merge initial-tables {"DemandRecords" demand-table
                                          "SupplyRecords" supply-table
                                          "PeriodRecords" period-table
