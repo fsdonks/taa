@@ -8,6 +8,10 @@
 (def input-map {;;Used for demand and supply to create a separate
                 ;;cycle time distribution for forward stationed units.
                 :forward-name forward-name
+                ;;Determine if we want to bin the RA supply into
+                ;;forward stationed and not forward-stationed for
+                ;;separate cycle time distribution.
+                :bin-forward? true
                 ;;Only need to set this to true if the filenames are
                 ;;going to be located as resources on the path.
                 ;;If using resources, the initial inputs are
