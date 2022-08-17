@@ -10,7 +10,7 @@
 (ns requirements-experiments)
 
 (def resource-root
-  "/home/craig/workspace/taa/resources/")
+  "/home/craig/workspace/taa/resources/requirements/")
 
 ;;before someone made separate notebooks for stopping after periods, I was going to use,
 
