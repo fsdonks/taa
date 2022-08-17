@@ -1,4 +1,4 @@
-(ns requirements-experiments
+(ns taa.requirements
   (:require [marathon.analysis.requirements.sensitivity :as snt]
             ;;marathon.analysis.tacmm.demo has stuff for updating parameters
             [marathon.analysis.tacmm.demo :as demo]

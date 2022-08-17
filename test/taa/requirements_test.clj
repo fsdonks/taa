@@ -1,13 +1,11 @@
-(require 'marathon.core)
-(ns marathon.core)
+(ns taa.requirements-test
+  (:require [clojure.test :refer :all]
+            [taa.requirements :as requirements]
+            [marathon.analysis.requirements.sensitivity :as snt]))
+
 ;;Usually, we set Ghost proportions aggregate to 1 0 0 for all SRCs in SupplyRecords
 ;;Usually, we set all AC SupplyRecords to False
 ;;easiest way to accoutn for both demands is  to concatenate both demandrecords for COMFORTER
-
-(load-file
- "/home/craig/workspace/taa/src/taa/requirements.clj")
-
-(ns requirements-experiments)
 
 (def resource-root
   "/home/craig/workspace/taa/test/resources/requirements/")
@@ -43,4 +41,7 @@
 
 
 ;;use snt/contours as contour-fn
-(time (stop-after-periods input-paths periods miss-days out-folder c-fn))
+(deftest requirements-check
+  (testing "Just checking if highest level taa requirements analysis
+function completes."
+    (requirements/stop-after-periods input-paths periods miss-days out-folder c-fn)))
