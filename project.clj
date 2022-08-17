@@ -2,7 +2,7 @@
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.10.1"]
                  ;;Exclude tools.reader.  Else, an error occurs.
-                 [spork "0.2.1.4-SNAPSHOT" :exclusions [org.clojure/tools.reader]]
+                 [spork "0.2.1.5-SNAPSHOT" :exclusions [org.clojure/tools.reader]]
                  [demand_builder "0.1.1-SNAPSHOT"]
                  ;;Used docjure proper instead of spork.util.excel.docjure because
                  ;;the latest version returns nil for blank cells.  blank cells were

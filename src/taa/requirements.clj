@@ -61,6 +61,17 @@
 
     ))
 
+(defn workbook-name
+  "Determine if a string is a path or url and return the filename
+  accordingly"
+  [path-or-url]
+  (let [path-or-url (if (instance? java.net.URL path-or-url)
+                      ;;url
+                      (.getPath path-or-url)
+                      ;;filepath
+                      path-or-url)]               
+    (io/drop-ext (io/fname path-or-url))))
+    
 ;;expect the same periods between workbooks For COMORTER, we'll output
 ;;our results in individual text files.
 ;;creates text files in out-dir named by wkbk_name-periodname-bound.txt
@@ -75,7 +86,7 @@
                                    #(update-last-day period  %)]
                            (group-by :bound (contour-fn path
                                                         missed-days)))
-                         :let [wkbk-name (io/drop-ext (io/fname path))
+                         :let [wkbk-name (workbook-name path)
                                case (str wkbk-name "__"
                                          period "__"
                                          bound)                              
