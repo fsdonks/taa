@@ -268,8 +268,15 @@
                                [:SRC :UNTDS :RA :ARNG :USAR]))))
         tblr (->> (columns->records rs
                                     [:SRC :UNTDS] :Quantity :Component)
-                  (filter (fn [{:keys [Quantity]}] (and Quantity
-                                                        (not (zero? Quantity))))))
+                  (map (fn [{:keys [Quantity] :as r}]
+                         (if Quantity
+                           r
+                           ;;Need 0 quantities for a requirements
+                           ;;analysis record if we are binning forward
+                           ;;stationed supply.
+                           ;;For capacity analysis, 0 supply quantity
+                           ;;would be out of scope.
+                           (assoc r :Quantity 0)))))
         policy-map (->> (record-map "policy_map") 
                         (reduce (fn [acc {:keys [SRC
                                                  CompositePolicyName]}]
