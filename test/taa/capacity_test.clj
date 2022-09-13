@@ -73,7 +73,7 @@
                                      "Vermont" 6)
                          :Category (if (clojure.string/includes? Vignette
                                                                  "Fwd")
-                                     "NonBOG"
+                                     "Forward"
                                      (case Vignette
                                        "Maine1" "NonBOG"
                                        "Maine2" "NonBOG"
