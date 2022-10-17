@@ -115,7 +115,18 @@
                      unavail (round-to 0 (* unavail-percent supply))
                      diff (- unavail (if-let [h (src-war-idaho src)]
                                        h
-                                       0))]]
+                                       0))
+                     ;;We used to use the cannibalized supply for idaho
+                     ;;Now we assume that the unavailable
+                     ;;number cannot be used for idaho.
+                     nonbog 
+                     (assoc nonbog-record
+                            :Quantity unavail
+                            :SRC src
+                            :StartDay cannibal-start-t
+                            :Duration (inc (- cannibal-end-t
+                                              cannibal-start-t)))
+                     idaho-quantity (- unavail diff)]]
                                         ;(cond
                                         ;(= diff 0) [(assoc idaho-record :Quantity unavail :SRC src)]
            
@@ -125,22 +136,21 @@
                                         ;                                   diff) :SRC src)
                                         ; (assoc nonbog-record :Quantity diff :SRC
                                         ;     src)]
-           [(assoc (idaho-record idaho-name)
-                   :Quantity (- unavail diff)
-                   :SRC src
-                   :StartDay idaho-start-t
-                   :Duration (inc (- idaho-end-t idaho-start-t)))
-            ;;This changed. This year we are assuming that the unavailable
-            ;;number cannot be used for idaho.
-            (assoc nonbog-record
-                   :Quantity unavail
-                   :SRC src
-                   :StartDay cannibal-start-t
-                   :Duration (inc (- cannibal-end-t cannibal-start-t)))]
-           )
-         (reduce concat)
-         (remove (fn [r] (= (:Quantity r) (float 0))))
-         (remove (fn [r] (= (:Quantity r) 0))))))
+           (if (or (= idaho-quantity (float 0))
+                   (= idaho-quantity 0))
+             ;;Don't need idaho, but even if the nonbog quantity is 0,
+             ;;we keep it so that we could assign a quantity to it
+             ;;later if we grow rc supply.
+             [nonbog]
+             ;;need idaho record, too
+             [nonbog 
+              (assoc (idaho-record idaho-name)
+                     :Quantity idaho-quantity
+                     :SRC src
+                     :StartDay idaho-start-t
+                     :Duration (inc (- idaho-end-t idaho-start-t)))
+              ]))
+         (reduce concat))))
 
 (def demand-records-root-order
   [:Type
