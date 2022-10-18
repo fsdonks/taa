@@ -80,7 +80,7 @@
                                        ( count rs) ) ) ] ) groups) ) ) )
 
 (defn idaho+cannibal-recs 
-  [src-rcsupply src-war-idaho src-unavail {:keys [phases
+  [src-rcsupply src-war-idaho src-unavails {:keys [phases
                                                   cannibal-start
                                                   cannibal-end
                                                   idaho-start
@@ -98,20 +98,17 @@
         [_ _ idaho-end-t]
         (first (filter (fn [[phase-name]]
                          (= phase-name idaho-end)) phases))
-        unavail5 (into {} (map (fn [ [s unavail]] [ (subs s 0 5)
-                                                   unavail]) src-unavail))
-        averages (branch-average src-unavail)
-        average (float (/ (reduce + (map second src-unavail))
-                          (count src-unavail)))]
+        {:keys [unavails unavails-5 unavails-branch unavail-overall]}
+        src-unavails]
     (->> (for [[src supply] src-rcsupply
-               :let [unavail-percent (if-let [u (src-unavail src)]
+               :let [unavail-percent (if-let [u (unavails src)]
                                        u
-                                       (if-let [u (unavail5 (subs
+                                       (if-let [u (unavails-5 (subs
                                                              src 0 5))]
                                          u
-                                         (if-let [u (averages (subs src 0 2))]
+                                         (if-let [u (unavails-branch (subs src 0 2))]
                                            u
-                                           average)))
+                                           unavail-overall)))
                      unavail (round-to 0 (* unavail-percent supply))
                      diff (- unavail (if-let [h (src-war-idaho src)]
                                        h
@@ -173,18 +170,19 @@
        (tbl/stringify-field-names)
        ))
 
-(defn get-idaho+cannibal-recs [workbook-recs {:keys [idaho-name] :as input-map}]
+(defn unavailables
+  "Given the SupplyDemand worksheet, compute the precent of rc
+  unavailable by src inside of a map.  Other values in the map are the
+  averages of rc unavailable by five-digit src, by branch, and
+  overall."
+  [workbook-recs rc-supply]
   (let [available-rc (->> (workbook-recs "SupplyDemand")
                           (reduce (fn [acc {:keys [SRC
                                                    RCAvailable] } ]
                                     (if (number? RCAvailable)
                                       (assoc acc SRC RCAvailable)
-                                      acc) ) {}) )
-        rc-supply (->> (workbook-recs "SupplyDemand")
-                       (map (fn [{:keys [SRC ARNG USAR]}] [SRC
-                                                           (reduce + (remove nil? [ARNG USAR]))]))
-                       (into {}))
-        rc-unavail (->> (for [[src supply] rc-supply
+                                      acc) ) {}))
+         rc-unavail (->> (for [[src supply] rc-supply
                               ;;when we have a available number for the src
                               ;;otherwise, this will defer to
                               ;;idaho+cannibal-recs to find unavailable
@@ -195,10 +193,24 @@
                                         ;;stopped.  should just rescan
                                         )) ])
                         (into {} ) )
-        src-war-idaho (->> (workbook-recs "SupplyDemand")
+        unavail5 (into {} (map (fn [ [s unavail]] [ (subs s 0 5)
+                                                   unavail]) rc-unavail))
+        averages (branch-average rc-unavail)
+        average (float (/ (reduce + (map second rc-unavail))
+                          (count rc-unavail)))]
+    {:unavails rc-unavail
+     :unvails-5 unavail5
+     :unavails-branch averages
+     :unavail-overall average}))
+    
+(defn get-idaho+cannibal-recs [workbook-recs rc-supply rc-unavailable {:keys [idaho-name] :as input-map}]
+  (let [src-war-idaho (->> (workbook-recs "SupplyDemand")
                            (reduce (fn [acc {:keys [SRC] :as r}]
                                      (assoc acc SRC (get r (keyword idaho-name)))) {})) ]
-    (idaho+cannibal-recs rc-supply src-war-idaho rc-unavail input-map)))
+    (idaho+cannibal-recs rc-supply
+                         src-war-idaho
+                         rc-unavailable input-map)))
+
 
 (defn get-vignettes
   "Return the vignette table records used for Demand Builder."
@@ -455,10 +467,16 @@
                           (xl/wb->tables)) "PeriodRecords")
         parameter-table ((-> (as-workbook parameters-path)
                              (xl/wb->tables)) "Parameters")
+        rc-supply (->> (workbook-recs "SupplyDemand")
+                       (map (fn [{:keys [SRC ARNG USAR]}]
+                              [SRC (reduce + (remove nil? [ARNG USAR]))]))
+                       (into {}))
+        rc-unavailables (unavailables workbook-recs rc-supply)
         demand-table (->> (tbl/tabdelimited->records demand-path)
                           (into [])
                           (concat (taa.capacity/get-idaho+cannibal-recs
-                                   workbook-recs input-map))
+                                   workbook-recs rc-supply rc-unavailables
+                                   input-map))
                           (map set-demand-params)
                           (taa.capacity/records->string-name-table))
         supply-table (taa.capacity/supply-table workbook-recs
