@@ -474,12 +474,12 @@
         rc-unavailables (unavailables workbook-recs rc-supply)
         demand-table (->> (tbl/tabdelimited->records demand-path)
                           (into [])
-                          (concat (taa.capacity/get-idaho+cannibal-recs
+                          (concat (get-idaho+cannibal-recs
                                    workbook-recs rc-supply rc-unavailables
                                    input-map))
                           (map set-demand-params)
-                          (taa.capacity/records->string-name-table))
-        supply-table (taa.capacity/supply-table workbook-recs
+                          (records->string-name-table))
+        supply-table (supply-table workbook-recs
                                                 default-rc-policy input-map)
         table-res (merge initial-tables {"DemandRecords" demand-table
                                          "SupplyRecords" supply-table
@@ -613,7 +613,7 @@
            forge-files] :as input-map}]
   ;;setup
   (io/make-folders! (str builder-inputs-path "/Outputs/"))
-  (taa.capacity/vignettes-to-file (workbook-recs "SupplyDemand") vignettes
+  (vignettes-to-file (workbook-recs "SupplyDemand") vignettes
                               builder-inputs-path)
   ;;move the timeline to this directory (copy)
   (if *testing?*
