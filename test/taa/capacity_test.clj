@@ -5,7 +5,15 @@
 ;;To do runs, you would load an input map in taa.core and call do-taa
 ;;without deftest.
 (def forward-name "AlaskaFwd")
-(def input-map {;;Used for demand and supply to create a separate
+(def input-map {;;Indicates that we want to merge ARNG and USAR into
+                ;;one RC compo, which makes random RC runs easier.
+                ;;This will cause RC and NG to be distributed
+                ;;across the same lifecycle.  We could prevent that
+                ;;with our supply preprocess tag for binning with an
+                ;;NG bin but we would need a proportion of the RC that
+                ;;is NG for that.
+                :merge-rc? true
+                ;;Used for demand and supply to create a separate
                 ;;cycle time distribution for forward stationed units.
                 :forward-name forward-name
                 ;;Determine if we want to bin the RA supply into

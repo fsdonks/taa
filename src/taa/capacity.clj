@@ -283,22 +283,42 @@
       (str "{:preprocess [align-units [[:"
            forward-name " " forward-num "]]]}"))))
 
+;;Need 0 quantities for a requirements
+;;analysis record if we are binning forward
+;;stationed supply.
+;;For capacity analysis, 0 supply quantity
+;;would be out of scope.
+(defn replace-nils
+  "Given a collection of fields and a collection of records, if the
+  fields are nil, replace them with 0."
+  [fields recs]
+  (for [r recs]
+    (reduce (fn [new-r field] 
+              (if (new-r field)
+                new-r
+                (assoc new-r field 0)))
+            r fields)))
+
+(defn merge-rc [merge-rc? recs]
+  (if merge-rc?
+          (map (fn [{:keys [ARNG USAR] :as r}]
+                 (assoc r :USAR (+ ARNG USAR))) recs)
+          recs))
+
 (defn supply-table
-  "Given" [record-map rc-default-policy input-map]
-  (let [rs (->> (record-map "SupplyDemand")
+  "Create the SupplyRecord for m4 from the SupplyDemand worksheet."
+  [record-map rc-default-policy {:keys [merge-rc?] :as input-map}]
+  (let [constant-cols [:SRC :UNTDS :RA :USAR]
+        kept-cols (if merge-rc?
+                    constant-cols
+                    (conj constant-cols :ARNG))
+        rs (->> (record-map "SupplyDemand")
+                (replace-nils [:RA :USAR :ARNG])
+                (merge-rc merge-rc?)
                 (map ( fn [r] ( select-keys r
-                               [:SRC :UNTDS :RA :ARNG :USAR]))))
-        tblr (->> (columns->records rs
-                                    [:SRC :UNTDS] :Quantity :Component)
-                  (map (fn [{:keys [Quantity] :as r}]
-                         (if Quantity
-                           r
-                           ;;Need 0 quantities for a requirements
-                           ;;analysis record if we are binning forward
-                           ;;stationed supply.
-                           ;;For capacity analysis, 0 supply quantity
-                           ;;would be out of scope.
-                           (assoc r :Quantity 0)))))
+                               kept-cols))))
+        tblr (columns->records rs
+                               [:SRC :UNTDS] :Quantity :Component)
         policy-map (->> (record-map "policy_map") 
                         (reduce (fn [acc {:keys [SRC
                                                  CompositePolicyName]}]
@@ -325,11 +345,7 @@
                                   policy)
                       :Tags  (tag-supply Component SRC forward-nums
                                          (:forward-name input-map))))]
-    (records->string-name-table final-recs)
-                                        ;(paste-ordered-records! final-recs
-                                        ;[:Type :Enabled :Quantity :SRC :Component :OITitle :Name
-                                        ;:Behavior :CycleTime :Policy :Tags :Spawntime :Location :Position]
-    ))
+    (records->string-name-table final-recs)))
 
 ;; so the taa dir will have
 ;;a supply demand workbook for each demand
