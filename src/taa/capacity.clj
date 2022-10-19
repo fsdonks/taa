@@ -79,6 +79,21 @@
                     [ group ( float (/ ( reduce + (map second rs) ) 
                                        ( count rs) ) ) ] ) groups) ) ) )
 
+(defn get-unavailability
+  "Returns a percent of RC unavailable for an SRC if that SRC exists
+  in the unavailable map.  Else, look for a five-digit SRC match (this
+  should probably be 5-digit average).  Else, look for a branch
+  average.  Else, return the average RC unavailability across all
+  SRCs."
+  [src {:keys [unavails unavails-5 unavails-branch unavail-overall]}]
+  (if-let [u (unavails src)]
+    u
+    (if-let [u (unavails-5 (subs src 0 5))]
+      u
+      (if-let [u (unavails-branch (subs src 0 2))]
+        u
+        unavail-overall))))
+  
 (defn idaho+cannibal-recs 
   [src-rcsupply src-war-idaho src-unavails {:keys [phases
                                                   cannibal-start
@@ -97,18 +112,10 @@
                          (= phase-name idaho-start)) phases))
         [_ _ idaho-end-t]
         (first (filter (fn [[phase-name]]
-                         (= phase-name idaho-end)) phases))
-        {:keys [unavails unavails-5 unavails-branch unavail-overall]}
-        src-unavails]
+                         (= phase-name idaho-end)) phases))]
     (->> (for [[src supply] src-rcsupply
-               :let [unavail-percent (if-let [u (unavails src)]
-                                       u
-                                       (if-let [u (unavails-5 (subs
-                                                             src 0 5))]
-                                         u
-                                         (if-let [u (unavails-branch (subs src 0 2))]
-                                           u
-                                           unavail-overall)))
+               :let [unavail-percent (get-unavailability src
+                                                         src-unavails)
                      unavail (round-to 0 (* unavail-percent supply))
                      diff (- unavail (if-let [h (src-war-idaho src)]
                                        h
