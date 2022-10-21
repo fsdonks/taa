@@ -275,18 +275,18 @@
   (->> (record-map "SupplyDemand")
        (reduce (fn [acc {:keys [SRC] :as r} ]
                  (let [quantity (r (keyword forward-name))]
-                   (if (and bin-forward?
-                            (number? quantity)
-                            (not (zero? quantity)))                                      
+                   (if (and
+                        (number? quantity)
+                        (not (zero? quantity)))                                    
                      (assoc acc SRC (int quantity))
                      acc) )) {}) ))
 
 (defn tag-supply
   "Return a tag for all supply records.  Currently only binning the forward
   stationed units."
-  [compo src forward-nums forward-name]
+  [bin-forward? compo src forward-nums forward-name]
   (let [forward-num (forward-nums src)]
-    (if (and (= compo "RA") (not (nil? forward-num)))
+    (if (and bin-forward? (= compo "RA") (not (nil? forward-num)))
       (str "{:preprocess [align-units [[:"
            forward-name " " forward-num "]]]}"))))
 
@@ -314,7 +314,8 @@
 
 (defn supply-table
   "Create the SupplyRecord for m4 from the SupplyDemand worksheet."
-  [record-map rc-default-policy {:keys [merge-rc?] :as input-map}]
+  [record-map rc-default-policy {:keys [merge-rc?
+                                        bin-forward?] :as input-map}]
   (let [constant-cols [:SRC :UNTDS :RA :USAR]
         kept-cols (if merge-rc?
                     constant-cols
@@ -350,7 +351,7 @@
                                        "NG" "USAR" "RC")
                       :Policy (if (= Component "RA") "Auto"
                                   policy)
-                      :Tags  (tag-supply Component SRC forward-nums
+                      :Tags  (tag-supply bin-forward? Component SRC forward-nums
                                          (:forward-name input-map))))]
     (records->string-name-table final-recs)))
 
