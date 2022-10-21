@@ -76,8 +76,8 @@
 (defn branch-average [src-unavail]
   (let [groups ( group-by ( fn [[src unavail]] ( subs src 0 2)) src-unavail)]
     ( into {} (map ( fn [ [ group rs] ] 
-                    [ group ( float (/ ( reduce + (map second rs) ) 
-                                       ( count rs) ) ) ] ) groups) ) ) )
+                    [ group (/ ( reduce + (map second rs) ) 
+                                       ( count rs) ) ] ) groups) ) ) )
 
 (defn get-unavailability
   "Returns a percent of RC unavailable for an SRC if that SRC exists
@@ -116,6 +116,7 @@
     (->> (for [[src supply] src-rcsupply
                :let [unavail-percent (get-unavailability src
                                                          src-unavails)
+                     ;;rounding availability down, would be Math/ceil here
                      unavail (round-to 0 (* unavail-percent supply))
                      diff (- unavail (if-let [h (src-war-idaho src)]
                                        h
@@ -203,8 +204,8 @@
         unavail5 (into {} (map (fn [ [s unavail]] [ (subs s 0 5)
                                                    unavail]) rc-unavail))
         averages (branch-average rc-unavail)
-        average (float (/ (reduce + (map second rc-unavail))
-                          (count rc-unavail)))]
+        average (/ (reduce + (map second rc-unavail))
+                          (count rc-unavail))]
     {:unavails rc-unavail
      :unvails-5 unavail5
      :unavails-branch averages
@@ -281,14 +282,40 @@
                      (assoc acc SRC (int quantity))
                      acc) )) {}) ))
 
+(defn tag-forward
+  "Returns a key and value string for the SupplyRecord Tags field so
+  that we can bin the forward stationed units."
+  [forward-name forward-num]
+  (str ":preprocess [align-units [[:"
+       forward-name " " forward-num "]]] "))
+
+(defn tag-unavailable
+  "Returns a key and value string for the SupplyRecord Tags field so
+  that we can indicate the number of RC units that should be
+  cannibalized."
+  [percent]
+  (str ":rc-unavailable " percent " "))
+
 (defn tag-supply
   "Return a tag for all supply records.  Currently only binning the forward
   stationed units."
-  [bin-forward? compo src forward-nums forward-name]
-  (let [forward-num (forward-nums src)]
+  [bin-forward? compo src forward-nums forward-name unavailables
+   merge-rc?]
+  (let [forward-num (forward-nums src)
+        unavailable (get-unavailability src unavailables)]
+    (str
+     ;;start of tag
+     "{"
     (if (and bin-forward? (= compo "RA") (not (nil? forward-num)))
-      (str "{:preprocess [align-units [[:"
-           forward-name " " forward-num "]]]}"))))
+      (tag-forward forward-name forward-num))
+    ;;only going to use this tag for multiple reps for the RC so they
+    ;;would have been merged into one compo.
+    (if (and (= compo "USAR") merge-rc?)
+      (tag-unavailable unavailable))
+    ;;end of tag
+    "}"
+    )))
+  
 
 ;;Need 0 quantities for a requirements
 ;;analysis record if we are binning forward
@@ -314,8 +341,8 @@
 
 (defn supply-table
   "Create the SupplyRecord for m4 from the SupplyDemand worksheet."
-  [record-map rc-default-policy {:keys [merge-rc?
-                                        bin-forward?] :as input-map}]
+  [record-map rc-default-policy rc-unavailables
+   {:keys [merge-rc? bin-forward?] :as input-map}]
   (let [constant-cols [:SRC :UNTDS :RA :USAR]
         kept-cols (if merge-rc?
                     constant-cols
@@ -351,8 +378,11 @@
                                        "NG" "USAR" "RC")
                       :Policy (if (= Component "RA") "Auto"
                                   policy)
-                      :Tags  (tag-supply bin-forward? Component SRC forward-nums
-                                         (:forward-name input-map))))]
+                      :Tags  (tag-supply bin-forward? Component SRC
+                                         forward-nums
+                                         (:forward-name input-map)
+                                         rc-unavailables
+                                         (:merge-rc? input-map))))]
     (records->string-name-table final-recs)))
 
 ;; so the taa dir will have
@@ -504,7 +534,10 @@
                           (map set-demand-params)
                           (records->string-name-table))
         supply-table (supply-table workbook-recs
-                                                default-rc-policy input-map)
+                                   default-rc-policy
+                                   rc-unavailables
+                                   input-map
+                                   )
         table-res (merge initial-tables {"DemandRecords" demand-table
                                          "SupplyRecords" supply-table
                                          "PeriodRecords" period-table
