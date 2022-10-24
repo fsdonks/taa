@@ -333,11 +333,26 @@
                 (assoc new-r field 0)))
             r fields)))
 
-(defn merge-rc [merge-rc? recs]
+(defn edta-output
+  "Takes SupplyDemand records and returns a subset of fields for the
+  edta supply input to R."
+  [recs]
+  (->> recs
+       (map (fn [r] (select-keys r [:USAR :RA :RC_Available :SRC])))
+       (map (fn [r] (clojure.set/rename-keys r {:USAR :RC})))))
+
+(defn merge-rc [merge-rc? rc-unavailables {:keys [resources-root]} recs]
   (if merge-rc?
-          (map (fn [{:keys [ARNG USAR] :as r}]
-                 (assoc r :USAR (+ ARNG USAR))) recs)
-          recs))
+    (let [modified-recs (map (fn [{:keys [ARNG USAR SRC] :as r}]
+                               (assoc r :USAR (+ ARNG USAR)
+                                      :RC_Available
+                                      (- 1 (get-unavailability SRC rc-unavailables))))
+                               recs)
+          _ (records->xlsx
+             (str resources-root "edta_supply.xlsx")
+             "edta_supply" (edta-output modified-recs))]
+      modified-recs)
+    recs))
 
 (defn supply-table
   "Create the SupplyRecord for m4 from the SupplyDemand worksheet."
@@ -349,7 +364,7 @@
                     (conj constant-cols :ARNG))
         rs (->> (record-map "SupplyDemand")
                 (replace-nils [:RA :USAR :ARNG])
-                (merge-rc merge-rc?)
+                (merge-rc merge-rc? rc-unavailables input-map)
                 (map ( fn [r] ( select-keys r
                                kept-cols))))
         tblr (columns->records rs
