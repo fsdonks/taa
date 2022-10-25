@@ -333,24 +333,35 @@
                 (assoc new-r field 0)))
             r fields)))
 
-(defn edta-output
-  "Takes SupplyDemand records and returns a subset of fields for the
-  edta supply input to R."
-  [recs]
-  (->> recs
-       (map (fn [r] (select-keys r [:USAR :RA :RC_Available :SRC])))
-       (map (fn [r] (clojure.set/rename-keys r {:USAR :RC})))))
-
-(defn merge-rc [merge-rc? rc-unavailables {:keys [resources-root]} recs]
+(defn prep-edta
+  "Given a record from a SupplyDemand worksheet, prep the input data
+  for the edta supply risk chart"
+  [rc-unavailables upper {:keys [RA USAR SRC] :as r} ]
+  (let [[low-rc high-rc] (random/bound->bounds USAR [0 upper])
+        [low-ac high-ac] (random/bound->bounds RA [0 upper])]
+    (-> r
+     (assoc 
+      :RC_Available (- 1 (get-unavailability SRC
+                                             rc-unavailables))
+      :RC high-rc
+      :RA high-ac)
+     (select-keys [:RC :RA :RC_Available :SRC]) )))
+           
+                    
+(defn merge-rc [merge-rc? rc-unavailables {:keys [resources-root
+                                                  identifier
+                                                  upper]} recs]
   (if merge-rc?
-    (let [modified-recs (map (fn [{:keys [ARNG USAR SRC] :as r}]
-                               (assoc r :USAR (+ ARNG USAR)
-                                      :RC_Available
-                                      (- 1 (get-unavailability SRC rc-unavailables))))
-                               recs)
+    (let [modified-recs (map (fn [{:keys [ARNG USAR] :as r}]
+                               (assoc r :USAR (+ ARNG USAR)))
+                             recs)
+          edta-recs (map (partial prep-edta rc-unavailables upper)
+                         modified-recs)
           _ (records->xlsx
-             (str resources-root "edta_supply.xlsx")
-             "edta_supply" (edta-output modified-recs))]
+             (str resources-root (str "edta_supply-" identifier
+                                      ".xlsx"))
+             "Sheet1"
+             edta-recs)]
       modified-recs)
     recs))
 
