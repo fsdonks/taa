@@ -13,7 +13,9 @@
                  [dk.ative/docjure "1.16.0"]
                  ;;currently, marathon is not pushed to clojars to
                  ;;need to lein install from the marathon repo first
-                 [marathon "4.2.4-SNAPSHOT"]]
+                 [marathon "4.2.4-SNAPSHOT"]
+                 ;;not in clojars either, this is fs-c's fork.
+                 [smiletest "0.1.0-SNAPSHOT"]]
   :repl-options {:init-ns taa.core}
   ;;This stuff below will allow us to build a runnable jar that
   ;;includes all dependencies by calling
@@ -23,7 +25,7 @@
   ;;java -jar taa-0.0.1.jar and call functions from there like in
   ;;taa.core-test.
   :profiles {;;load our tests from resources just like in the uberjar
-             :dev {:resource-paths ["test/resources"]}
+             :dev {:resource-paths ["test/resources" "../krigingdemo/src"]}
              :uberjar {:aot [taa.main]
                        :main  taa.main
                        :jvm-opts ^:replace ["-Xmx1000m" "-XX:NewSize=200m" "-server"]
