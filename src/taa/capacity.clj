@@ -10,7 +10,9 @@
             [dk.ative.docjure.spreadsheet :as dj]
             [demand_builder.m4plugin :as plugin]
             [marathon.analysis.random :as random]
-            [marathon.analysis :as a]))
+            [marathon.analysis :as a]
+            [taa.scoring :as score]
+            [taa.util :as util]))
 
 ;;indicate that we should load resources from the jar as opposed to
 ;;the file system
@@ -173,11 +175,6 @@
    :Operation
    :Category] )
 
-(defn records->string-name-table [recs]
-  (->> (tbl/records->table recs)
-       (tbl/stringify-field-names)
-       ))
-
 (defn unavailables
   "Given the SupplyDemand worksheet, compute the precent of rc
   unavailable by src inside of a map.  Other values in the map are the
@@ -236,11 +233,6 @@
                            (zero?
                             (:Quantity r)))))))
 
-(defn records->xlsx [wbpath sheetname recs]
-  (->> (records->string-name-table recs)
-       (xl/table->xlsx wbpath sheetname)
-       ))
-
 (defn vignettes-to-file
   "Given the standard supply demand records with vignettes as columns,
   select only the columns for the vignettes we need, put them in a
@@ -252,7 +244,7 @@
               (select-keys r (concat [:SRC :UNTDS]
                                      (map keyword vignette-names)))))
        (get-vignettes)
-       (records->xlsx (str out-dir
+       (util/records->xlsx (str out-dir
                            "vignettes.xlsx") "Sheet1")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -357,7 +349,7 @@
                              recs)
           edta-recs (map (partial prep-edta rc-unavailables upper)
                          modified-recs)
-          _ (records->xlsx
+          _ (util/records->xlsx
              (str resources-root (str "edta_supply-" identifier
                                       ".xlsx"))
              "Sheet1"
@@ -409,7 +401,7 @@
                                          (:forward-name input-map)
                                          rc-unavailables
                                          (:merge-rc? input-map))))]
-    (records->string-name-table final-recs)))
+    (util/records->string-name-table final-recs)))
 
 ;; so the taa dir will have
 ;;a supply demand workbook for each demand
@@ -558,7 +550,7 @@
                                    workbook-recs rc-supply rc-unavailables
                                    input-map))
                           (map set-demand-params)
-                          (records->string-name-table))
+                          (util/records->string-name-table))
         supply-table (supply-table workbook-recs
                                    default-rc-policy
                                    rc-unavailables
@@ -657,7 +649,7 @@
                                    lower
                                    upper
                                    threads
-                                   include-no-demand]}]
+                                   include-no-demand] :as input-map}]
   (let [proj (a/load-project in-path)
         results
         (binding [random/*threads* threads]
@@ -671,8 +663,10 @@
                                                phases
                                                lower
                                                upper))
-                    results)]
-    (random/write-output (str resources-root "results_" identifier ".txt") results)))
+                    results)
+        out-name (str resources-root "results_" identifier)]
+    (random/write-output (str out-name ".txt") results)
+    (score/scores->xlsx results (str out-name "_risk.xlsx") input-map)))
 
 ;;Best way to structure taa inputs?
 ;;might use the same timeline, so keep the path specified to that and

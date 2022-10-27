@@ -5,7 +5,29 @@
 ;;To do runs, you would load an input map in taa.core and call do-taa
 ;;without deftest.
 (def forward-name "AlaskaFwd")
-(def input-map {;;Indicates that we want to merge ARNG and USAR into
+(defn assess-risk [x]
+  (cond (>= x 0.999) 5
+        (>= x 0.90) 4
+        (>= x 0.80) 3
+	(>= x 0.70) 2
+        :else 1))
+
+(def default-weights
+  {"comp" 0.2
+   "phase-1" 0.2
+   "phase-2" 0.2
+   "phase-3" 0.2
+   "phase-4" 0.2
+   })
+
+(def input-map {;;If this key and :phase-weights are included, produces a risk file from
+                ;;results.txt based on this function that will bin the
+                ;;Score into different categories
+                :assessor assess-risk
+                ;;compute a weighted sum of the percentage of demand
+                ;;met from each phase using this map of phase name to weight.
+                :phase-weights default-weights
+                ;;Indicates that we want to merge ARNG and USAR into
                 ;;one RC compo, which makes random RC runs easier.
                 ;;This will cause RC and NG to be distributed
                 ;;across the same lifecycle.  We could prevent that

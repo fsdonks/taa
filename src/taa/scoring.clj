@@ -1,6 +1,7 @@
 (ns taa.scoring
   (:require [spork.util.table :as tbl]
-            [smiletest.core :as smile]))
+            [smiletest.core :as smile]
+            [taa.util :as util]))
 
 (defn total-fill
   "Sum the total fill across components."
@@ -97,6 +98,15 @@
        (group-by :src)
        (map (partial interpolate lerper assessor))
        (reduce concat)))
+
+(defn scores->xlsx
+  [run-recs out-path {:keys [assessor phase-weights]}]
+  ;;Might not always want to spit these risk results
+  (if (and assessor phase-weights)
+    (->> (score-results run-recs :assessor assessor
+                        :phase-weights phase-weights)
+         (util/records->xlsx out-path "Sheet1"))))
+    
        
   
 
