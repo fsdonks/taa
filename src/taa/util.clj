@@ -13,3 +13,6 @@
        (xl/table->xlsx wbpath sheetname)
        ))
 
+(defn edta-supply-path
+  [{:keys [resources-root identifier]}]
+  (str resources-root (str "edta_supply-" identifier ".xlsx")))

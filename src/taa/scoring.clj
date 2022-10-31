@@ -100,7 +100,8 @@
        (reduce concat)))
 
 (defn scores->xlsx
-  [run-recs out-path {:keys [assessor phase-weights]}]
+  [run-recs out-path {:keys [assessor phase-weights
+                             ]}]
   ;;Might not always want to spit these risk results
   (if (and assessor phase-weights)
     (->> (score-results run-recs :assessor assessor

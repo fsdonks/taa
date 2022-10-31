@@ -25,7 +25,9 @@
   ;;java -jar taa-0.0.1.jar and call functions from there like in
   ;;taa.core-test.
   :profiles {;;load our tests from resources just like in the uberjar
-             :dev {:resource-paths ["test/resources" "../krigingdemo/src"]}
+             :dev {:resource-paths ["test/resources"
+                                    ;"../krigingdemo/src"
+                                    ]}
              :uberjar {:aot [taa.main]
                        :main  taa.main
                        :jvm-opts ^:replace ["-Xmx1000m" "-XX:NewSize=200m" "-server"]

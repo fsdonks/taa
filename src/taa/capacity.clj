@@ -324,7 +324,7 @@
                 new-r
                 (assoc new-r field 0)))
             r fields)))
-
+  
 (defn prep-edta
   "Given a record from a SupplyDemand worksheet, prep the input data
   for the edta supply risk chart"
@@ -340,9 +340,8 @@
      (select-keys [:RC :RA :RC_Available :SRC]) )))
            
                     
-(defn merge-rc [merge-rc? rc-unavailables {:keys [resources-root
-                                                  identifier
-                                                  upper]} recs]
+(defn merge-rc [merge-rc? rc-unavailables {:keys [upper]
+                                           :as input-map} recs]
   (if merge-rc?
     (let [modified-recs (map (fn [{:keys [ARNG USAR] :as r}]
                                (assoc r :USAR (+ ARNG USAR)))
@@ -350,8 +349,7 @@
           edta-recs (map (partial prep-edta rc-unavailables upper)
                          modified-recs)
           _ (util/records->xlsx
-             (str resources-root (str "edta_supply-" identifier
-                                      ".xlsx"))
+             (util/edta-supply-path input-map)
              "Sheet1"
              edta-recs)]
       modified-recs)
@@ -761,7 +759,8 @@
   values.  This does both the preprocessing and MARATHON runs."
   [{:keys [testing?] :as input-map}]
   (binding [*testing?* testing?]
-    (do-taa-runs (preprocess-taa input-map) input-map)))
+    (let [out-path (preprocess-taa input-map)]
+    (do-taa-runs out-path input-map))))
 
 
 ;;supply: search for parent, child relationship
