@@ -26,7 +26,8 @@
   ;;taa.core-test.
   :profiles {;;load our tests from resources just like in the uberjar
              :dev {:resource-paths ["test/resources"
-                                    ;"../krigingdemo/src"
+                                        ;"../krigingdemo/src"
+                                    "../marathon/src"
                                     ]}
              :uberjar {:aot [taa.main]
                        :main  taa.main

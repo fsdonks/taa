@@ -191,8 +191,10 @@
                               ;;when we have a available number for the src
                               ;;otherwise, this will defer to
                               ;;idaho+cannibal-recs to find unavailable
-                              :when (available-rc src)]
-                          [src (- 1 (if (zero? supply) 0
+                               :when (available-rc src)]
+                           ;;new assumption to default to 0.5 here
+                           [src (- 1 (if (or (zero? (available-rc src))
+                                             (zero? supply)) 0.5
                                         (/ (available-rc src)
                                            supply)
                                         ;;stopped.  should just rescan
