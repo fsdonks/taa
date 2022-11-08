@@ -330,9 +330,11 @@
 (defn prep-edta
   "Given a record from a SupplyDemand worksheet, prep the input data
   for the edta supply risk chart"
-  [rc-unavailables upper {:keys [RA USAR SRC] :as r} ]
-  (let [[low-rc high-rc] (random/bound->bounds USAR [0 upper])
-        [low-ac high-ac] (random/bound->bounds RA [0 upper])]
+  [rc-unavailables upper min-distance {:keys [RA USAR SRC] :as r} ]
+  (let [[low-rc high-rc] (random/bound->bounds USAR [0 upper]
+                                               :min-distance min-distance)
+        [low-ac high-ac] (random/bound->bounds RA [0 upper]
+                                               :min-distance min-distance)]
     (-> r
      (assoc 
       :RC_Available (- 1 (get-unavailability SRC
@@ -342,13 +344,13 @@
      (select-keys [:RC :RA :RC_Available :SRC]) )))
            
                     
-(defn merge-rc [merge-rc? rc-unavailables {:keys [upper]
+(defn merge-rc [merge-rc? rc-unavailables {:keys [upper min-distance]
                                            :as input-map} recs]
   (if merge-rc?
     (let [modified-recs (map (fn [{:keys [ARNG USAR] :as r}]
                                (assoc r :USAR (+ ARNG USAR)))
                              recs)
-          edta-recs (map (partial prep-edta rc-unavailables upper)
+          edta-recs (map (partial prep-edta rc-unavailables upper min-distance)
                          modified-recs)
           _ (util/records->xlsx
              (util/edta-supply-path input-map)
