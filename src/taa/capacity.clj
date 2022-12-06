@@ -340,8 +340,10 @@
       :RC_Available (- 1 (get-unavailability SRC
                                              rc-unavailables))
       :RC high-rc
-      :RA high-ac)
-     (select-keys [:RC :RA :RC_Available :SRC]) )))
+      :RA high-ac
+      :T2 30
+      :T3 60)
+     (select-keys [:RC :RA :RC_Available :SRC :T2 :T3]) )))
            
                     
 (defn merge-rc [merge-rc? rc-unavailables {:keys [upper min-distance]
@@ -651,13 +653,15 @@
                                    lower
                                    upper
                                    threads
-                                   include-no-demand] :as input-map}]
+                                   include-no-demand
+                                   seed] :or {seed random/+default-seed} :as input-map}]
   (let [proj (a/load-project in-path)
         results
         (binding [random/*threads* threads]
           (random/rand-runs proj :reps reps :phases phases :lower lower
                             :upper upper :compo-lengths
-                            compo-lengths))
+                            compo-lengths
+                            :seed seed))
         results (if include-no-demand (concat results
                                               (add-no-demand
                                                proj
