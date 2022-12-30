@@ -654,7 +654,7 @@
                                    upper
                                    threads
                                    include-no-demand
-                                   seed] :or {seed random/+default-seed} :as input-map}]
+                                   seed] :or {seed random/+default-seed+} :as input-map}]
   (let [proj (a/load-project in-path)
         results
         (binding [random/*threads* threads]
@@ -672,7 +672,8 @@
                     results)
         out-name (str resources-root "results_" identifier)]
     (random/write-output (str out-name ".txt") results)
-    (score/scores->xlsx results (str out-name "_risk.xlsx") input-map)))
+    (score/scores->xlsx results (str out-name "_risk.xlsx") input-map)
+    ))
 
 ;;Best way to structure taa inputs?
 ;;might use the same timeline, so keep the path specified to that and
