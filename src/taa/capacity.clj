@@ -264,24 +264,33 @@
    :Location "Auto",
    :position "Auto"})
 
+(defn add-quantities
+  "Given multiple forward stationed demands, add quantity of each
+  forward stationed demand together."
+  [supply-demand-rec forward-names]
+  (->>
+   forward-names
+   (map keyword)
+   (map supply-demand-rec)
+   (filter number?)
+   (reduce +)))
+                                           
 (defn forward-quantities
   "Returns a map of SRC to the forward stationed quantity."
-  [record-map {:keys [forward-name bin-forward?]}]
+  [record-map {:keys [forward-names bin-forward?]}]
   (->> (record-map "SupplyDemand")
        (reduce (fn [acc {:keys [SRC] :as r} ]
-                 (let [quantity (r (keyword forward-name))]
-                   (if (and
-                        (number? quantity)
-                        (not (zero? quantity)))                                    
+                 (let [quantity (add-quantities r forward-names)]
+                   (if (not (zero? quantity))                                    
                      (assoc acc SRC (int quantity))
                      acc) )) {}) ))
 
 (defn tag-forward
   "Returns a key and value string for the SupplyRecord Tags field so
   that we can bin the forward stationed units."
-  [forward-name forward-num]
-  (str ":preprocess [align-units [[:"
-       forward-name " " forward-num "]]] "))
+  [forward-num]
+  (str ":preprocess [align-units [["
+       :forward " " forward-num "]]] "))
 
 (defn tag-unavailable
   "Returns a key and value string for the SupplyRecord Tags field so
@@ -293,15 +302,14 @@
 (defn tag-supply
   "Return a tag for all supply records.  Currently only binning the forward
   stationed units."
-  [bin-forward? compo src forward-nums forward-name unavailables
-   merge-rc?]
+  [bin-forward? compo src forward-nums unavailables merge-rc?]
   (let [forward-num (forward-nums src)
         unavailable (get-unavailability src unavailables)]
     (str
      ;;start of tag
      "{"
     (if (and bin-forward? (= compo "RA") (not (nil? forward-num)))
-      (tag-forward forward-name forward-num))
+      (tag-forward forward-num))
     ;;only going to use this tag for multiple reps for the RC so they
     ;;would have been merged into one compo.
     (if (and (= compo "USAR") merge-rc?)
@@ -402,7 +410,6 @@
                                   policy)
                       :Tags  (tag-supply bin-forward? Component SRC
                                          forward-nums
-                                         (:forward-name input-map)
                                          rc-unavailables
                                          (:merge-rc? input-map))))]
     (util/records->string-name-table final-recs)))

@@ -1,10 +1,11 @@
 (ns taa.capacity-test
   (:require [clojure.test :refer :all]
-            [taa.capacity :as capacity]))
+            [taa.capacity :as capacity]
+            [clojure.string :as string]))
 
 ;;To do runs, you would load an input map in taa.core and call do-taa
 ;;without deftest.
-(def forward-name "AlaskaFwd")
+(def forward-names #{"AlaskaFwd" "UtahFwd"})
 (defn assess-risk [x]
   (cond (>= x 0.999) 5
         (>= x 0.90) 4
@@ -41,7 +42,7 @@
                 :merge-rc? true
                 ;;Used for demand and supply to create a separate
                 ;;cycle time distribution for forward stationed units.
-                :forward-name forward-name
+                :forward-names forward-names
                 ;;Determine if we want to bin the RA supply into
                 ;;forward stationed and not forward-stationed for
                 ;;separate cycle time distribution.
@@ -72,15 +73,16 @@
                 :policy-map-name "rc_war_policy_mapping.xlsx"
                 ;;a set of vignettes to keep from SupplyDemand (ensure SupplyDemand
                 ;;has RCAvailable and Idaho)
-                :vignettes #{forward-name
-                             "AlaskaRot"
-                             "Maine1"
-                             "Maine2"
-                             "Maine3"
+                :vignettes (into #{
+                                   "AlaskaRot"
+                                   "Maine1"
+                                   "Maine2"
+                                   "Maine3"
                                         ;"Colorado"
-                             "Wyoming"
+                                   "Wyoming"
                                         ;"Idaho"
-                             "Vermont"}
+                                   "Vermont"}
+                                 forward-names)
                 ;; a default RC policy name
                 :default-rc-policy "TAA_2125_Capacity_RC_1"
                 ;;a post-process function with priority, category, and sourcefirst
@@ -95,7 +97,8 @@
                   (assoc r :DemandGroup Vignette
                          :Priority (condp = Vignette
                                      "RC_NonBOG-War" 1
-                                     forward-name 1
+                                     "AlaskaFwd" 1
+                                     "UtahFwd" 1
                                      "AlaskaRot" 6
                                      "Maine1" 2
                                      "Maine2" 2
@@ -114,7 +117,7 @@
                                        ;;"Maine3" "Rotational"
                                        Category
                                        ))
-                         :SourceFirst (if (clojure.string/includes? Vignette
+                         :SourceFirst (if (string/includes? Vignette
                                                                     "Fwd")
                                         "NOT-RC-MIN"
                                         (case Vignette
@@ -122,10 +125,9 @@
                                           "NOT-AC"
                                           "Maine2" "NOT-AC"
                                           SourceFirst))
-                         :Tags (condp = Vignette
-                                 forward-name
-                                 (str "{:region :" forward-name "}")
-                                 ""
+                         :Tags (cond (contains? forward-names Vignette)
+                                 (str "{:region " :forward "}")
+                                 :else ""
                                  )))
                 ;;an excursion name to prepend to output files
                 :identifier "Colorado_single"
