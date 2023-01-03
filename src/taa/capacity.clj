@@ -119,7 +119,7 @@
                :let [unavail-percent (get-unavailability src
                                                          src-unavails)
                      ;;rounding availability down, would be Math/ceil here
-                     unavail (round-to 0 (* unavail-percent supply))
+                     unavail (Math/ceil (* unavail-percent supply))
                      diff (- unavail (if-let [h (src-war-idaho src)]
                                        h
                                        0))
