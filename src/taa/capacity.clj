@@ -469,8 +469,7 @@
 ;;For an unkown reason, getCellType is returning an int, which doesn't
 ;;dispatch to any of the methods below.  One fix is to use the static
 ;;method forInt to return the CellType object which will dispatch properly.
-(defmulti read-cell #(when % (. CellType (forInt (.getCellType ^Cell
-                                                               %)))))
+(defmulti read-cell #(when % (.getCellType ^Cell  %)))
 (defmethod read-cell CellType/BLANK     [_]     nil)
 (defmethod read-cell nil [_] nil)
 (defmethod read-cell CellType/STRING    [^Cell cell]

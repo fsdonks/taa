@@ -2,10 +2,10 @@
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.10.1"]
                  ;;Exclude tools.reader.  Else, an error occurs.
-                 [spork "0.2.1.5-SNAPSHOT" :exclusions
+                 [spork "0.2.1.6-SNAPSHOT" :exclusions
                   [org.clojure/tools.reader
                    ;;need to exclude for tech.ml.dataset
-                   ;com.taoensso/nippy
+                   ;;com.taoensso/nippy                   
                    ]]
                  [demand_builder "0.1.1-SNAPSHOT"]
                  ;;Used docjure proper instead of spork.util.excel.docjure because
@@ -14,7 +14,7 @@
                  ;;is from an xlsx worksheet and then copy the same data to a tab
                  ;;delimited text file, similar to Excel->Save As->tab delimited text
                  ;;file in order to save FORGE SRC by day for demand builder.
-                 [dk.ative/docjure "1.16.0"]
+                 [dk.ative/docjure "1.19.0"]
                  ;;currently, marathon is not pushed to clojars to
                  ;;need to lein install from the marathon repo first
                  [marathon "4.2.4-SNAPSHOT"]
