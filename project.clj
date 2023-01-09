@@ -8,13 +8,6 @@
                    ;;com.taoensso/nippy                   
                    ]]
                  [demand_builder "0.1.1-SNAPSHOT"]
-                 ;;Used docjure proper instead of spork.util.excel.docjure because
-                 ;;the latest version returns nil for blank cells.  blank cells were
-                 ;;filtered out in older versions.  This allows us to copy  the data as
-                 ;;is from an xlsx worksheet and then copy the same data to a tab
-                 ;;delimited text file, similar to Excel->Save As->tab delimited text
-                 ;;file in order to save FORGE SRC by day for demand builder.
-                 [dk.ative/docjure "1.19.0"]
                  ;;currently, marathon is not pushed to clojars to
                  ;;need to lein install from the marathon repo first
                  [marathon "4.2.4-SNAPSHOT"]

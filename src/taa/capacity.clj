@@ -7,7 +7,6 @@
             [spork.util.io :as io]
             [spork.util.excel [docjure :as doc]
              [core :as xl]]
-            [dk.ative.docjure.spreadsheet :as dj]
             [demand_builder.m4plugin :as plugin]
             [marathon.analysis.random :as random]
             [marathon.analysis :as a]
@@ -434,7 +433,7 @@
   "Loads an Excel workbook from resources if we are running tests, or loads the workbooks from filepath."
   [filepath]
   (if *testing?*
-    (dj/load-workbook-from-resource filepath)
+    (doc/load-workbook-from-resource filepath)
     (xl/as-workbook filepath)))
 
   
@@ -459,44 +458,19 @@
 
 ;;save the SRC_by_day worksheet as tab delimitted text for demand
 ;;builder
-;;Need to rewrite read-cell to dispatch properly per below comments.
-;;Need to unmap a multimethod in order to redefine it.  Only changing
-;;the dispatching method and the CellType/STRING method.
-(ns-unmap 'dk.ative.docjure.spreadsheet 'read-cell)
-                                        ;(ns dk.ative.docjure.spreadsheet)
-(ns dk.ative.docjure.spreadsheet)
+(ns spork.util.excel.docjure)
 (require '[clojure.string :as string])
-;;For an unkown reason, getCellType is returning an int, which doesn't
-;;dispatch to any of the methods below.  One fix is to use the static
-;;method forInt to return the CellType object which will dispatch properly.
-(defmulti read-cell #(when % (.getCellType ^Cell  %)))
-(defmethod read-cell CellType/BLANK     [_]     nil)
-(defmethod read-cell nil [_] nil)
-(defmethod read-cell CellType/STRING    [^Cell cell]
-  (let [s (.getStringCellValue cell)]
-    (if (string/includes? s "\n")
-      ;;Need put the cell values that have a newline in them
-      ;;in quotes so that it opens as tab
-      ;;delimited in Excel properly.
-                                        ;(str "\"" s "\"")
-      (string/replace s #"\n" "")
-      s)))                                                    
-(defmethod read-cell CellType/FORMULA   [^Cell cell]
-  (let [evaluator (.. cell getSheet getWorkbook
-                      getCreationHelper createFormulaEvaluator)
-        cv (.evaluate evaluator cell)]
-    (if (and (= CellType/NUMERIC (.getCellType cv))
-             (DateUtil/isCellDateFormatted cell))
-      (.getDateCellValue cell)
-      (read-cell-value cv false))))
-(defmethod read-cell CellType/BOOLEAN   [^Cell cell]  (.getBooleanCellValue cell))
-(defmethod read-cell CellType/NUMERIC   [^Cell cell]
-  (if (DateUtil/isCellDateFormatted cell)
-    (.getDateCellValue cell)
-    (.getNumericCellValue cell)))
-(defmethod read-cell CellType/ERROR     [^Cell cell]
-  (keyword (.name (FormulaError/forInt (.getErrorCellValue cell)))))
 
+(defn read-and-strip
+  "Turn a cell into a string with read-cell but also put the cell
+  values that have a newline in them in quotes so that it opens as tab
+  delimited in Excel properly."
+  [c]
+  (let [v (read-cell c)]
+    (when v
+      (clojure.string/replace v #"\n" "")
+      )))
+       
 (defn save-forge
   "Save the src by day worksheet as tab delimited text for demand
   builder.  Expect SRC_By_Day to be a worksheet in the xlsx file
@@ -510,7 +484,7 @@
                             (map (fn [x] (if x (cell-seq x))))
                             (map #(reduce str (interleave
                                                (map (fn [c]
-                                                      (read-cell c)) %)
+                                                      (read-and-strip c)) %)
                                                (repeat "\t"))))
                             ((fn [x] (interleave x (repeat "\n"))))
                             ;;One extra newline to remove at the end.
@@ -715,7 +689,7 @@
           :let [in-path (if *testing?*
                           forge-file-name
                           (str resources-root forge-file-name))]]
-          (dj/save-forge in-path (str outputs-path "FORGE_SE-"
+          (doc/save-forge in-path (str outputs-path "FORGE_SE-"
                                       forge-name ".txt"))))
 
 (defn preprocess-taa
