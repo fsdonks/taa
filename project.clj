@@ -1,4 +1,4 @@
-(defproject taa "0.0.1-SNAPSHOT"
+(defproject taa "0.0.2-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.10.1"]
                  ;;Exclude tools.reader.  Else, an error occurs.
