@@ -16,6 +16,7 @@
   ;;Then you can run the capsule from the terminal with
   ;;java -jar taa-0.0.1.jar and call functions from there like in
   ;;taa.core-test.
+  :source-paths ["src" "test"]
   :profiles {;;load our tests from resources just like in the uberjar
              :dev {:resource-paths ["test/resources"]
                                         :jvm-opts ^:replace ["-Xmx8g"]
