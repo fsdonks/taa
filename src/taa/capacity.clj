@@ -205,7 +205,7 @@
         average (/ (reduce + (map second rc-unavail))
                           (count rc-unavail))]
     {:unavails rc-unavail
-     :unvails-5 unavail5
+     :unavails-5 unavail5
      :unavails-branch averages
      :unavail-overall average}))
     
