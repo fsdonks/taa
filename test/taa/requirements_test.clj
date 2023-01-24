@@ -19,8 +19,10 @@
 (str resource-root "forward_not-tagged.xlsx")
                   ])
 
-(def input-paths (map (fn [path] (java.io/resource path))
-                      input-paths))
+(defn as-resources [paths]
+  (map (fn [path] (java.io/resource path)) paths))
+
+(def input-paths (as-resources input-paths))
 
 ;;3 cases: the entire demand, through ph4, and through ph3
 (def periods [
