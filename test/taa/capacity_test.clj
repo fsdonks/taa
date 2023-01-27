@@ -21,7 +21,11 @@
    "phase-4" 0.2
    })
 
-(def input-map {;;Used to indicate the minimum number of inventories
+(def input-map {;;if you want to Enabled all DemandRecords and then
+                ;;filter those DemandRecords according to this
+                ;;function
+                :demand-filter-fn nil
+                ;;Used to indicate the minimum number of inventories
                 ;;covered in the edta supply output.  This doesn't
                 ;;affect the min-distance for the runs right now.
                 :min-distance 5

@@ -622,9 +622,21 @@
              :NG (get compo-map "NG" 0)
              :RC (get compo-map "RC" 0)))))
 
+(defn filter-demand "Given a marathon project, Enable all of
+  DemandRecords first in case some were disabled, and then filter the
+  DemandRecords based on the filter-fn.  We use DemandRecords instead
+  of SupplyRecords because DemandRecords are more likely to be
+  modified with "
+  [filter-fn p]
+  (let [enabling-fn (map (fn [{:keys [Enabled] :as r}]
+                           (assoc r :Enabled true)))]
+    (update p :tables a/xform-tables
+            {:DemandRecords
+            [(filter filter-fn)
+             enabling-fn]})))
+
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py
-
 (defn do-taa-runs [in-path {:keys [identifier
                                    resources-root
                                    phases
@@ -634,8 +646,13 @@
                                    upper
                                    threads
                                    include-no-demand
-                                   seed] :or {seed random/+default-seed+} :as input-map}]
+                                   seed
+                                   demand-filter-fn] :or
+                            {seed random/+default-seed+} :as input-map}]
   (let [proj (a/load-project in-path)
+        proj (if demand-filter-fn
+               (filter-demand demand-filter-fn proj)
+               proj)
         results
         (binding [random/*threads* threads]
           (random/rand-runs proj :reps reps :phases phases :lower lower
