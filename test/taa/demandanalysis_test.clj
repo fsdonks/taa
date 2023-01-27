@@ -1,8 +1,9 @@
 (ns taa.demandanalysis-test
   (:require [clojure.test :refer :all]
-            [taa.demandanalysis-test :as taalysis]
+            [taa.demandanalysis :as taalysis]
             [taa.requirements-test :as req-test]
-            [proc.demandanalysis :as proclysis]))
+            [proc.demandanalysis :as proclysis]
+            [spork.util.io :as io]))
 
 (def input-paths [
                   (str  "requirements/testdata-v7-bog.xlsx")
@@ -44,3 +45,22 @@
 case.")
     (is (= (set peaks-2) verified-peaks2)
         "Check if peaks-from is working properly on a more complicated case.")))
+
+(deftest checking-max
+  (let [max-map {"a" "requirements/base-testdata-v7.xlsx"
+                 "b" (second input-resources)}
+        maxes (taalysis/max-demand  max-map "Surge")
+        [src [peak demand]] (first
+                             (filter (fn [[k v]] (= k "01205K000"))
+                                     maxes))
+        maxes-path "test-output/max-a_b.xlsx"
+        ;;just in case we haven't created the test-output/ folder from
+        ;;the capacity-analysis tests yet
+        _ (io/make-folders! "test-output/")]
+    (is (= demand "a") 
+        "For this SRC, b has a peak of 11 and a has a peak of 27, so the max
+should be a.")
+    (testing "Just checking to make sure we can write out our maxes
+  workbook."
+      (taalysis/maxes->xlsx! max-map "Surge" "b" maxes-path))))
+

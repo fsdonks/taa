@@ -1,4 +1,4 @@
-(defproject taa "0.0.6-SNAPSHOT"
+(defproject taa "0.0.7-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
                  ;[proc "0.3.0-SNAPSHOT"]
@@ -17,8 +17,7 @@
   :profiles {;;load our tests from resources just like in the uberjar
              :dev {:resource-paths ["test/resources"]
                    :jvm-opts ^:replace ["-Xmx8g"]
-                   :source-paths ["../marathon/src"
-                                  "../proc/src"]
+                   :source-paths []
                    }}
   :plugins [[reifyhealth/lein-git-down "0.4.1"]]
   :middleware [lein-git-down.plugin/inject-properties]
