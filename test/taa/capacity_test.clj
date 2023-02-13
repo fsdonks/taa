@@ -21,10 +21,17 @@
    "phase-4" 0.2
    })
 
-(def input-map {;;if you want to Enabled all DemandRecords and then
-                ;;filter those DemandRecords according to this
-                ;;function
-                :demand-filter-fn nil
+(def srcs-to-filter
+  #{"01205K000"})
+
+
+
+(def input-map {;;if you want to Enabled all SupplyRecords and then
+                ;;filter those SupplyRecords, you could use
+                ;;:transform-proj
+                ;;(capacity/supply-src-filter
+                ;;srcs-to-filter true) 
+                
                 ;;Used to indicate the minimum number of inventories
                 ;;covered in the edta supply output.  This doesn't
                 ;;affect the min-distance for the runs right now.

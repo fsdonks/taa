@@ -622,18 +622,40 @@
              :NG (get compo-map "NG" 0)
              :RC (get compo-map "RC" 0)))))
 
-(defn filter-demand "Given a marathon project, Enable all of
-  DemandRecords first in case some were disabled, and then filter the
-  DemandRecords based on the filter-fn.  We use DemandRecords instead
-  of SupplyRecords because DemandRecords are more likely to be
-  modified with "
-  [filter-fn p]
-  (let [enabling-fn (map (fn [{:keys [Enabled] :as r}]
-                           (assoc r :Enabled true)))]
-    (update p :tables a/xform-tables
-            {:DemandRecords
-            [(filter filter-fn)
-             enabling-fn]})))
+(defn conj-in
+  "for each value in a map, conj an item x, onto that value."
+  [m x]
+  (into {}
+        (for [[k v] m]
+          [k (conj v x)])))
+
+(defn enabling-fn
+  "Return a transducer to enable all records when used with xform-records."
+  []
+  (map (fn [{:keys [Enabled] :as r}]
+         (assoc r :Enabled true))))
+
+(defn enable-before-transform
+  [trans-map]
+  (conj-in trans-map enabling-fn))
+
+(defn filter-srcs
+  "Return a transducer that filters (or removes) records where the SRC
+  doesn't match."
+  [srcs filter?]
+  (let [f (if filter? filter remove)]
+    (f (fn [{:keys [SRC] :as r}]
+         (contains? srcs SRC)))))
+                     
+(defn supply-src-filter
+  [srcs filter?]
+  (enable-before-transform
+   {:SupplyRecords
+    ;;could have multiple transforms here, too.
+    ;;They are evaluated from right to left.
+    ;;Remove srcs with false
+   [(filter-srcs srcs filter?)]
+    }))
 
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py
@@ -647,12 +669,16 @@
                                    threads
                                    include-no-demand
                                    seed
-                                   demand-filter-fn] :or
+                                   transform-proj] :or
                             {seed random/+default-seed+} :as input-map}]
   (let [proj (a/load-project in-path)
-        proj (if demand-filter-fn
-               (filter-demand demand-filter-fn proj)
+        proj (-> (if transform-proj
+               (a/update-proj-tables transform-proj proj)
                proj)
+                  ;;we require rc cannibalization modification for taa
+                  ;;but maybe this isn't standard for ac-rc random
+                  ;;runs yet
+                  (random/add-transform random/adjust-cannibals []))
         results
         (binding [random/*threads* threads]
           (random/rand-runs proj :reps reps :phases phases :lower lower

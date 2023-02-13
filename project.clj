@@ -12,7 +12,7 @@
                  :timeout 120000}
 
   ;;allow testing ns and data to be resolved for transitive dep.
-  :source-paths   ["src" "test"]
+  :source-paths   ["src" "test" "../m4/src/"]
   :resource-paths ["test/resources"]
   :profiles {;;load our tests from resources just like in the uberjar
              :dev {:resource-paths ["test/resources"]
