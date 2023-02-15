@@ -1,0 +1,3 @@
+file: m4_book_Colorado_single-before_multicompos.xlsx
+copied from capacity preprocessing test output from version
+0.0.9-SNAPSHOT taa/test-output/m4_book_Colorado_single.xlsx

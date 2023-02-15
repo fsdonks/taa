@@ -273,16 +273,38 @@
    (map supply-demand-rec)
    (filter number?)
    (reduce +)))
-                                           
+
+(defn check-forwards
+  "Check to see if we only have ac units forward like we used to for
+  backwards compatability since now we're extending this to multiple
+  compos."
+  [forward-names]
+  (if (set? forward-names)
+    ;;only ac forward
+    ;;maintains backwards compatability
+    {:ac forward-names}
+    forward-names))
+
+(defn forward-reducer
+  "Given one set of forward stationed demand names, conj the sum of
+  those demand quanties onto the vector of quantities for each compo."
+  [r compo-quantities name-set]
+  (let [quantity (add-quantities r name-set)]
+    (conj compo-quantities
+          ;;conjs nil otherwise
+          (when (not (zero? quantity))
+            quantity))))
+            
 (defn forward-quantities
   "Returns a map of SRC to the forward stationed quantity."
-  [record-map {:keys [forward-names bin-forward?]}]
-  (->> (record-map "SupplyDemand")
-       (reduce (fn [acc {:keys [SRC] :as r} ]
-                 (let [quantity (add-quantities r forward-names)]
-                   (if (not (zero? quantity))                                    
-                     (assoc acc SRC (int quantity))
-                     acc) )) {}) ))
+  [record-map {:keys [forward-names]}]
+  (let [{:keys [ac ng rc]} (check-forwards forward-names)]
+    (->> (record-map "SupplyDemand")
+         (reduce (fn [acc {:keys [SRC] :as r} ]
+                   (assoc acc SRC
+                          (reduce (partial forward-reducer r)
+                                  [] [ac ng rc])))
+                 {}))))
 
 (defn tag-forward
   "Returns a key and value string for the SupplyRecord Tags field so
@@ -302,17 +324,20 @@
   "Return a tag for all supply records.  Currently only binning the forward
   stationed units."
   [bin-forward? compo src forward-nums unavailables merge-rc?]
-  (let [forward-num (forward-nums src)
+  (let [[ac-forward ng-forward rc-forward] (forward-nums src)
         unavailable (get-unavailability src unavailables)]
     (str
      ;;start of tag
      "{"
-    (if (and bin-forward? (= compo "RA") (not (nil? forward-num)))
-      (tag-forward forward-num))
+    (when (and bin-forward? (= compo "RA") (not (nil? ac-forward)))
+      (tag-forward ac-forward))
     ;;only going to use this tag for multiple reps for the RC so they
     ;;would have been merged into one compo.
-    (if (and (= compo "USAR") merge-rc?)
-      (tag-unavailable unavailable))
+    (when (and (= compo "USAR") merge-rc?)
+      (str (tag-unavailable unavailable)
+           (when rc-forward (tag-forward rc-forward))))
+    (when (and (= compo "ARNG") ng-forward)
+      (tag-forward ng-forward))
     ;;end of tag
     "}"
     )))

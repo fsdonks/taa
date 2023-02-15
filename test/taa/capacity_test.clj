@@ -1,11 +1,14 @@
 (ns taa.capacity-test
   (:require [clojure.test :refer :all]
             [taa.capacity :as capacity]
-            [clojure.string :as string]))
+            [clojure.string :as string]
+            [clojure.java.io :as jio]))
 
 ;;To do runs, you would load an input map in taa.core and call do-taa
 ;;without deftest.
 (def forward-names #{"AlaskaFwd" "UtahFwd"})
+(def forward-names-rc #{"CompFwdRC"})
+
 (defn assess-risk [x]
   (cond (>= x 0.999) 5
         (>= x 0.90) 4
@@ -190,11 +193,18 @@
                 :include-no-demand true
                 })
 
-(deftest capacity-check
-    (testing "Just checking if highest level taa function completes
-    for capacity analysis preprocessing and runs."
-      (capacity/do-taa input-map)))
-
 ;;if you want preprocess first and then visually check, call
 ;;preprocess-taa first and then call do-taa-runs on the output
 ;;workbook.
+
+
+(deftest do-taa-test
+  (binding [capacity/*testing?* true]
+    (let [;;This will run through the taa preprocessing
+          out-path (capacity/preprocess-taa input-map)]
+      (testing "Checking if taa capacity analysis runs complete."
+        (capacity/do-taa-runs out-path input-map))
+
+      )))
+
+
