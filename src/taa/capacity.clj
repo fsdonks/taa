@@ -272,7 +272,8 @@
    (map keyword)
    (map supply-demand-rec)
    (filter number?)
-   (reduce +)))
+   (reduce +)
+   (int)))
 
 (defn check-forwards
   "Check to see if we only have ac units forward like we used to for

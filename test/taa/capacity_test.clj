@@ -2,7 +2,8 @@
   (:require [clojure.test :refer :all]
             [taa.capacity :as capacity]
             [clojure.string :as string]
-            [clojure.java.io :as jio]))
+            [clojure.java.io :as jio]
+            [proc.util :as putil]))
 
 ;;To do runs, you would load an input map in taa.core and call do-taa
 ;;without deftest.
@@ -197,14 +198,23 @@
 ;;preprocess-taa first and then call do-taa-runs on the output
 ;;workbook.
 
+(def previous-book
+  (->> "m4_book_Colorado_single-before_multicompos.xlsx"
+       (jio/resource)))
 
 (deftest do-taa-test
   (binding [capacity/*testing?* true]
     (let [;;This will run through the taa preprocessing
-          out-path (capacity/preprocess-taa input-map)]
+          out-path (capacity/preprocess-taa input-map)
+          previous-demands (putil/demand-records previous-book)
+          previous-supply (putil/supply-records previous-book)]
+      (is (= previous-demands (putil/demand-records out-path))
+          "After enabling multiple compos forward, if we only
+have ac forward, is our demand still the same?.")
+      (is (= previous-supply (putil/supply-records out-path))
+          "After enabling multiple compos forward, if we only
+have ac forward, is our supply still the same?.")
       (testing "Checking if taa capacity analysis runs complete."
-        (capacity/do-taa-runs out-path input-map))
-
-      )))
+        (capacity/do-taa-runs out-path input-map)))))
 
 
