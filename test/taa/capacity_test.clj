@@ -202,19 +202,34 @@
   (->> "m4_book_Colorado_single-before_multicompos.xlsx"
        (jio/resource)))
 
+(defn consistent-demand
+  "We want to make sure that our demand is the same before and after
+  the multi compo forward stationing but we added a new demand so we
+  need to filter that out."
+  [m4-book]
+  (->> (putil/demand-records m4-book)
+       (remove (fn [{:keys [Vignette]}] (= "CampFwdRC" Vignette)))))
+
+(defn consistent-supply
+  "We want to make sure that our supply is the same before and after
+  the multi compo forward stationing but after we add new test data
+  for the rc, this will only hold for the ac now since we don't have
+  any ng."
+  [m4-book]
+  (->> (putil/supply-records m4-book)
+       (filter (fn [{:keys [Component]}] (= "AC" Component)))))
+   
 (deftest do-taa-test
   (binding [capacity/*testing?* true]
     (let [;;This will run through the taa preprocessing
           out-path (capacity/preprocess-taa input-map)
-          previous-demands (putil/demand-records previous-book)
-          previous-supply (putil/supply-records previous-book)]
-      (is (= previous-demands (putil/demand-records out-path))
+          previous-demands (consistent-demand previous-book)
+          previous-supply (consistent-supply previous-book)]
+      (is (= previous-demands (consistent-demand out-path))
           "After enabling multiple compos forward, if we only
 have ac forward, is our demand still the same?.")
-      (is (= previous-supply (putil/supply-records out-path))
+      (is (= previous-supply (consistent-supply out-path))
           "After enabling multiple compos forward, if we only
 have ac forward, is our supply still the same?.")
       (testing "Checking if taa capacity analysis runs complete."
         (capacity/do-taa-runs out-path input-map)))))
-
-
