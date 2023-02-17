@@ -7,8 +7,11 @@
 
 ;;To do runs, you would load an input map in taa.core and call do-taa
 ;;without deftest.
-(def forward-names #{"AlaskaFwd" "UtahFwd"})
+(def forward-names-ac #{"AlaskaFwd" "UtahFwd"})
 (def forward-names-rc #{"CompFwdRC"})
+(def forward-map {:ac forward-names-ac
+                  :rc forward-names-rc})
+(def forward-names (capacity/fwd-demands forward-map))
 
 (defn assess-risk [x]
   (cond (>= x 0.999) 5
@@ -57,7 +60,7 @@
                 :merge-rc? true
                 ;;Used for demand and supply to create a separate
                 ;;cycle time distribution for forward stationed units.
-                :forward-names forward-names
+                :forward-names forward-map
                 ;;Determine if we want to bin the RA supply into
                 ;;forward stationed and not forward-stationed for
                 ;;separate cycle time distribution.
@@ -88,7 +91,7 @@
                 :policy-map-name "rc_war_policy_mapping.xlsx"
                 ;;a set of vignettes to keep from SupplyDemand (ensure SupplyDemand
                 ;;has RCAvailable and Idaho)
-                :vignettes (into #{
+                :vignettes (clojure.set/union #{
                                    "AlaskaRot"
                                    "Maine1"
                                    "Maine2"
@@ -114,6 +117,7 @@
                                      "RC_NonBOG-War" 1
                                      "AlaskaFwd" 1
                                      "UtahFwd" 1
+                                     "CompFwdRC" 1
                                      "AlaskaRot" 6
                                      "Maine1" 2
                                      "Maine2" 2
@@ -208,7 +212,7 @@
   need to filter that out."
   [m4-book]
   (->> (putil/demand-records m4-book)
-       (remove (fn [{:keys [Vignette]}] (= "CampFwdRC" Vignette)))))
+       (remove (fn [{:keys [Vignette]}] (= "CompFwdRC" Vignette)))))
 
 (defn consistent-supply
   "We want to make sure that our supply is the same before and after

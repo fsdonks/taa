@@ -275,6 +275,15 @@
    (reduce +)
    (int)))
 
+(defn fwd-demands
+  "Given a map of :compo to a set of demand names for that compo,
+  return all of the demand names in a set.  Also works if a set is passed
+  instead of a map for backward compatability."
+  [compo-demands]
+  (if (map? compo-demands)
+    (reduce clojure.set/union (vals compo-demands))
+    compo-demands))
+
 (defn check-forwards
   "Check to see if we only have ac units forward like we used to for
   backwards compatability since now we're extending this to multiple
