@@ -1,4 +1,4 @@
-(defproject taa "0.0.11-SNAPSHOT"
+(defproject taa "0.0.12-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
                  ;[proc "0.3.0-SNAPSHOT"]

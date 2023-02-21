@@ -40,9 +40,8 @@
                 ;;srcs-to-filter true) 
                 
                 ;;Used to indicate the minimum number of inventories
-                ;;covered in the edta supply output.  This doesn't
-                ;;affect the min-distance for the runs right now.
-                :min-distance 5
+                ;;covered in the edta supply output and for the random runs.
+                :min-distance 0
                 ;;If this key and :phase-weights are included, produces a risk file from
                 ;;results.txt based on this function that will bin the
                 ;;Score into different categories

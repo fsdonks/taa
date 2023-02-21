@@ -700,12 +700,17 @@
                                    compo-lengths
                                    reps
                                    lower
+                                   lower-rc
                                    upper
+                                   upper-rc
                                    threads
                                    include-no-demand
                                    seed
-                                   transform-proj] :or
-                            {seed random/+default-seed+} :as input-map}]
+                                   transform-proj
+                                   min-distance] :or
+                            {seed random/+default-seed+
+                             lower-rc 1 upper-rc 1
+                             min-distance 0} :as input-map}]
   (let [proj (a/load-project in-path)
         proj (-> (if transform-proj
                (a/update-proj-tables transform-proj proj)
@@ -716,7 +721,9 @@
                   (random/add-transform random/adjust-cannibals []))
         results
         (binding [random/*threads* threads]
-          (random/rand-runs proj :reps reps :phases phases :lower lower
+          (random/rand-runs-ac-rc min-distance lower-rc upper-rc
+                                  proj :reps reps :phases phases
+                                  :lower lower
                             :upper upper :compo-lengths
                             compo-lengths
                             :seed seed))
