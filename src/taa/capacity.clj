@@ -664,9 +664,8 @@
         (for [[k v] m]
           [k (conj v x)])))
 
-(defn enabling-fn
-  "Return a transducer to enable all records when used with xform-records."
-  []
+;;A transducer to enable all records when used with xform-records.
+(def enabling-fn
   (map (fn [{:keys [Enabled] :as r}]
          (assoc r :Enabled true))))
 
