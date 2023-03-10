@@ -118,7 +118,8 @@
                :let [unavail-percent (get-unavailability src
                                                          src-unavails)
                      ;;rounding availability down, would be Math/ceil here
-                     unavail (Math/ceil (* unavail-percent supply))
+                     unavail (random/cannibal-quantity unavail-percent
+                                                       supply)
                      diff (- unavail (if-let [h (src-war-idaho src)]
                                        h
                                        0))
@@ -194,7 +195,7 @@
                            ;;new assumption to default to 0.5 here
                            [src (- 1 (if (or (zero? (available-rc src))
                                              (zero? supply)) 0.5
-                                        (/ (available-rc src)
+                                        (/ (int (available-rc src))
                                            supply)
                                         ;;stopped.  should just rescan
                                         )) ])
@@ -566,7 +567,7 @@
                              (xl/wb->tables)) "Parameters")
         rc-supply (->> (workbook-recs "SupplyDemand")
                        (map (fn [{:keys [SRC ARNG USAR]}]
-                              [SRC (reduce + (remove nil? [ARNG USAR]))]))
+                              [SRC (int (reduce + (remove nil? [ARNG USAR])))]))
                        (into {}))
         rc-unavailables (unavailables workbook-recs rc-supply)
         demand-table (->> (tbl/tabdelimited->records demand-path)
