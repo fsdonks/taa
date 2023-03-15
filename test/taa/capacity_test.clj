@@ -3,7 +3,8 @@
             [taa.capacity :as capacity]
             [clojure.string :as string]
             [clojure.java.io :as jio]
-            [proc.util :as putil]))
+            [proc.util :as putil]
+            [clojure.set :as cset]))
 
 ;;To do runs, you would load an input map in taa.core and call do-taa
 ;;without deftest.
@@ -212,9 +213,9 @@
   
 (defn all-diffs
   [prev-ds cons-ds]
-  (let [srcs (map :SRC (cset/difference (set prev-demands)
+  (let [srcs (map :SRC (cset/difference (set prev-ds)
                                                   (set
-                                                   cons-demands)))]
+                                                   cons-ds)))]
     (map (partial diffs - prev-ds cons-ds) srcs)))
 
 (defn all-one-more?
