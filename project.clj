@@ -1,8 +1,8 @@
-(defproject taa "0.0.13-SNAPSHOT"
+(defproject taa "0.0.14-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
                  ;[proc "0.3.0-SNAPSHOT"]
-                 [marathon "4.2.9-SNAPSHOT"]
+                 [marathon "4.2.10-SNAPSHOT"]
                  ;;not in clojars either, this is fs-c's fork.
                  [smiletest "0.1.0-SNAPSHOT"]
                  ;[com.clojure-goes-fast/clj-memory-meter "0.2.1"]
