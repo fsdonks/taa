@@ -1,7 +1,7 @@
-(defproject taa "0.0.15-SNAPSHOT"
+(defproject taa "0.0.16-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [marathon "4.2.11-SNAPSHOT"]
+                 [marathon "4.2.12-SNAPSHOT"]
                  [smiletest "0.1.1-SNAPSHOT"]
                  ;[com.clojure-goes-fast/clj-memory-meter "0.2.1"]
                  ;[techascent/tech.ml.dataset "7.000-beta-2"]

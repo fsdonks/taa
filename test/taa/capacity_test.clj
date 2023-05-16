@@ -279,21 +279,6 @@
   (->> (putil/supply-records m4-book)
        (filter (fn [{:keys [Component]}] (= "AC" Component)))))
 
-(deftest forge-decimals
-  (binding [capacity/*testing?* true]
-    (let [;;This will run through the taa preprocessing
-          out-path (capacity/preprocess-taa (assoc input-map
-                                                   :forge-files
-                                                   {"Colorado"
-                                                    "forge_decimals.xlsx"
-                                                    "forge2"
-                                                    "SupplyDemand.xlsx"
-                                                    }))]
-      ;(testing "Checking if we can preprocess FORGE files with
-;demical quantities."
-        ;(capacity/do-taa-runs out-path input-map))
-          )))
-
 (deftest do-taa-test
   (binding [capacity/*testing?* true]
     (let [;;This will run through the taa preprocessing
