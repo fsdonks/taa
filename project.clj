@@ -4,7 +4,7 @@
                  [marathon "4.2.12-SNAPSHOT"]
                  [smiletest "0.1.1-SNAPSHOT"]
                  ;[com.clojure-goes-fast/clj-memory-meter "0.2.1"]
-                 ;[techascent/tech.ml.dataset "7.000-beta-2"]
+                 [scicloj/tablecloth "7.000-beta-38"]
                  ]
   :repl-options {:init-ns taa.core
                  :timeout 120000}
