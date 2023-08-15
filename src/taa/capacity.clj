@@ -94,69 +94,101 @@
       (if-let [u (unavails-branch (subs src 0 2))]
         u
         unavail-overall))))
-  
+
+;;Both of these functions should return a sequence of records for one
+;;record for the hld demand record and one record for the
+;;cannibalization demand record.
+
+;;Sometimes we want to use the cannibalized supply for hld
+(defn cannibals-in-hld
+  [num-cann num-hld num-cann-hld {:keys [idaho-name] :as input-map}]
+  (if
+      (<= num-cann-hld 0)
+    [(assoc (idaho-record idaho-name)
+            :Quantity num-hld
+            :SRC src)]    
+    [(assoc (idaho-record idaho-name)
+            :Quantity num-hld
+            :SRC src)
+     (assoc nonbog-record
+            :Quantity num-cann-hld
+            :SRC src)]))
+
+;;Now we assume that the unavailable
+;;number cannot be used for hld.
+(defn cannibals-not-in-hld
+  [num-cann num-hld num-cann-hld src
+   {:keys [idaho-name] :as input-map}
+   {:keys [cannibal-start-t 
+           cannibal-end-t 
+           hld-start-t 
+           hld-end-t]}]
+  (let [nonbog 
+        (assoc nonbog-record
+               :Quantity num-cann
+               :SRC src
+               :StartDay cannibal-start-t
+               :Duration (inc (- cannibal-end-t
+                                 cannibal-start-t)))]
+    (if (or (= num-hld (float 0))
+            (= num-hld 0))
+      ;;Don't need hld, but even if the nonbog quantity is 0,
+      ;;we keep it so that we could assign a quantity to it
+      ;;later if we grow rc supply.
+      [nonbog]
+      ;;need hld record, too
+      [nonbog 
+       (assoc (idaho-record idaho-name)
+              :Quantity num-hld
+              :SRC src
+              :StartDay idaho-start-t
+              :Duration (inc (- idaho-end-t idaho-start-t)))
+       ])
+    ))
+
+(defn get-phase-time
+  "Return the phase start time if start? is true.  Otherwise, return
+  the phase end time from the sequence of phases."
+  [phases phase start?]
+  (let [[phase-id phase-start phase-end]
+        (first (filter (fn [[phase-name]]
+                         (= phase-name phase)) phases))]
+    (if start? phase-start phase-end)))
+    
+(defn hld-cannibal-times
+  "Given an input map, returns the start and end times of the initial
+  and final phases for hld and cannibal demands."
+  [{:keys [phases
+           cannibal-start
+           cannibal-end
+           idaho-start
+           idaho-end
+           idaho-name] :as
+    input-map}]
+  {:cannibal-start-t (get-phase-time phases cannibal-start true)
+   :cannibal-end-t (get-phase-time phases cannibal-end false)
+   :idaho-start-t (get-phase-time phases idaho-start true)
+   :idaho-end-t (get-phase-time phases idaho-end false)})
+
 (defn idaho+cannibal-recs 
-  [src-rcsupply src-war-idaho src-unavails {:keys [phases
-                                                  cannibal-start
-                                                  cannibal-end
-                                                  idaho-start
-                                                  idaho-end
-                                                  idaho-name]}]
-  (let [[_ cannibal-start-t _]
-        (first (filter (fn [[phase-name]]
-                         (= phase-name cannibal-start)) phases))
-        [_ _ cannibal-end-t]
-        (first (filter (fn [[phase-name]]
-                         (= phase-name cannibal-end)) phases))
-        [_ idaho-start-t _]
-        (first (filter (fn [[phase-name]]
-                         (= phase-name idaho-start)) phases))
-        [_ _ idaho-end-t]
-        (first (filter (fn [[phase-name]]
-                         (= phase-name idaho-end)) phases))]
+  [src-rcsupply src-war-idaho src-unavails {:keys [cannibals-in-hld?]
+                                            :as
+                                            input-map}]
+  (let [hld-cannibal-ts (hld-cannibal-times input-map)]
     (->> (for [[src supply] src-rcsupply
                :let [unavail-percent (get-unavailability src
                                                          src-unavails)
                      ;;rounding availability down, would be Math/ceil here
                      unavail (random/cannibal-quantity unavail-percent
                                                        supply)
-                     diff (- unavail (if-let [h (src-war-idaho src)]
+                     num-hld (if-let [h (src-war-idaho src)]
                                        h
-                                       0))
-                     ;;We used to use the cannibalized supply for idaho
-                     ;;Now we assume that the unavailable
-                     ;;number cannot be used for idaho.
-                     nonbog 
-                     (assoc nonbog-record
-                            :Quantity unavail
-                            :SRC src
-                            :StartDay cannibal-start-t
-                            :Duration (inc (- cannibal-end-t
-                                              cannibal-start-t)))
-                     idaho-quantity (- unavail diff)]]
-                                        ;(cond
-                                        ;(= diff 0) [(assoc idaho-record :Quantity unavail :SRC src)]
-           
-                                        ;(< diff 0) [(assoc idaho-record :Quantity (- unavail
-                                        ;                                          diff) :SRC src)]
-                                        ;:else [(assoc idaho-record :Quantity (- unavail
-                                        ;                                   diff) :SRC src)
-                                        ; (assoc nonbog-record :Quantity diff :SRC
-                                        ;     src)]
-           (if (or (= idaho-quantity (float 0))
-                   (= idaho-quantity 0))
-             ;;Don't need idaho, but even if the nonbog quantity is 0,
-             ;;we keep it so that we could assign a quantity to it
-             ;;later if we grow rc supply.
-             [nonbog]
-             ;;need idaho record, too
-             [nonbog 
-              (assoc (idaho-record idaho-name)
-                     :Quantity idaho-quantity
-                     :SRC src
-                     :StartDay idaho-start-t
-                     :Duration (inc (- idaho-end-t idaho-start-t)))
-              ]))
+                                       0)
+                     num-cann-hld (- unavail num-hld)]]                                        
+           (if cannibals-in-hld?
+             (cannibals-not-in-hld unavail num-hld num-cann-hld src
+                                   input-map hld-cannibal-ts)
+           ))
          (reduce concat))))
 
 (def demand-records-root-order

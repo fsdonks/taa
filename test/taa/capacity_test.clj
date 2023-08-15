@@ -177,8 +177,10 @@
                          ["phase-2" 855 974]
                          ["phase-3" 975 1022]
                          ["phase-4" 1023 1789]]
-                ;;For the most recent TAA, we
-                ;;are currently assuming that cannibalized units can't be used for anything!
+                ;;Usually, we assume that cannibalized units can't be
+                ;;used for HLD demands.  For some excursions, we allow
+                ;;them to be used for HLD demands.
+                :cannibals-in-hld? false
                 :cannibal-start "phase-1"
                 :cannibal-end "phase-3"
                 :idaho-start "phase-1"
