@@ -50,19 +50,19 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;demand building tools
-(def nonbog-record {:Vignette "RC_NonBOG-War"
+(def nonbog-record {:Vignette random/cannibal-name
                     :Type "DemandRecord"
                     :Category "NonBOG-RC-Only"
                     :Overlap 45
                     :SourceFirst "NOT-AC-MIN"
-                    :Operation "RC_NonBOG-War"
+                    :Operation random/cannibal-name
                     :Enabled "TRUE"
                     :Demandindex "l"
                     :Priority 4
                     (keyword "Title 10_32") 10
                     :Quantity nil
                     :SRC nil
-                    :DemandGroup "RC_NonBOG-War"
+                    :DemandGroup random/cannibal-name
                     :OITitle "unnecessary"})
 
 (defn idaho-record [name]
@@ -95,29 +95,11 @@
         u
         unavail-overall))))
 
-;;Both of these functions should return a sequence of records for one
+;;Returns a sequence of records for one
 ;;record for the hld demand record and one record for the
 ;;cannibalization demand record.
-
-;;Sometimes we want to use the cannibalized supply for hld
-(defn cannibals-in-hld
-  [num-cann num-hld num-cann-hld {:keys [idaho-name] :as input-map}]
-  (if
-      (<= num-cann-hld 0)
-    [(assoc (idaho-record idaho-name)
-            :Quantity num-hld
-            :SRC src)]    
-    [(assoc (idaho-record idaho-name)
-            :Quantity num-hld
-            :SRC src)
-     (assoc nonbog-record
-            :Quantity num-cann-hld
-            :SRC src)]))
-
-;;Now we assume that the unavailable
-;;number cannot be used for hld.
-(defn cannibals-not-in-hld
-  [num-cann num-hld num-cann-hld src
+(defn hld-cannibal-recs
+  [cannibals-in-hld num-cann num-hld num-cann-hld src
    {:keys [idaho-name] :as input-map}
    {:keys [cannibal-start-t 
            cannibal-end-t 
@@ -129,22 +111,31 @@
                :SRC src
                :StartDay cannibal-start-t
                :Duration (inc (- cannibal-end-t
-                                 cannibal-start-t)))]
-    (if (or (= num-hld (float 0))
-            (= num-hld 0))
-      ;;Don't need hld, but even if the nonbog quantity is 0,
-      ;;we keep it so that we could assign a quantity to it
-      ;;later if we grow rc supply.
-      [nonbog]
-      ;;need hld record, too
-      [nonbog 
-       (assoc (idaho-record idaho-name)
-              :Quantity num-hld
-              :SRC src
-              :StartDay idaho-start-t
-              :Duration (inc (- idaho-end-t idaho-start-t)))
-       ])
-    ))
+                                 cannibal-start-t)))
+        hld (assoc (idaho-record idaho-name)
+                   :Quantity num-hld
+                   :SRC src
+                   :StartDay idaho-start-t
+                   :Duration (inc (- idaho-end-t idaho-start-t)))
+        ;;Even if the nonbog quantity is 0,
+        ;;we keep it so that we could assign a quantity to it
+        ;;later if we grow rc supply.
+        num-cann-hld-floor (if (<= num-cann-hld 0)
+                             0
+                             num-cann-hld)
+        recs-with-hld (if (or (= num-hld (float 0))
+                              (= num-hld 0))
+                        ;;Don't need hld
+                        []
+                        ;;need hld record, too
+                        [hld])]
+    (conj recs-with-hld
+          (if cannibals-in-hld?
+            ;;Sometimes we want to use the cannibalized supply for hld
+            (assoc nonbog :Quantity num-cann-hld-floor)
+            ;;Now we assume that the unavailable
+            ;;number cannot be used for hld.
+            nonbog))))
 
 (defn get-phase-time
   "Return the phase start time if start? is true.  Otherwise, return
@@ -185,10 +176,8 @@
                                        h
                                        0)
                      num-cann-hld (- unavail num-hld)]]                                        
-           (if cannibals-in-hld?
-             (cannibals-not-in-hld unavail num-hld num-cann-hld src
-                                   input-map hld-cannibal-ts)
-           ))
+           (hld-cannibal-recs cannibals-in-hld? unavail num-hld num-cann-hld src
+                              input-map hld-cannibal-ts))
          (reduce concat))))
 
 (def demand-records-root-order
@@ -745,7 +734,9 @@
                                    include-no-demand
                                    seed
                                    transform-proj
-                                   min-distance] :or
+                                   min-distance
+                                   cannibals-in-hld?
+                                   idaho-name] :or
                             {seed random/+default-seed+
                              lower-rc 1 upper-rc 1
                              min-distance 0} :as input-map}]
@@ -756,7 +747,8 @@
                   ;;we require rc cannibalization modification for taa
                   ;;but maybe this isn't standard for ac-rc random
                   ;;runs yet
-                  (random/add-transform random/adjust-cannibals []))
+                  (random/add-transform random/adjust-cannibals
+                                        [cannibals-in-hld? idaho-name]))
         results
         (binding [random/*threads* threads]
           (random/rand-runs-ac-rc min-distance lower-rc upper-rc
