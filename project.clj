@@ -1,8 +1,7 @@
-(defproject taa "0.0.16-SNAPSHOT"
+(defproject taa "0.0.17-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [marathon "4.2.12-SNAPSHOT"]
-                 [smiletest "0.1.1-SNAPSHOT"]
+                 [marathon "4.2.13-SNAPSHOT"]
                  ;[com.clojure-goes-fast/clj-memory-meter "0.2.1"]
                  ;[techascent/tech.ml.dataset "7.000-beta-2"]
                  ]
@@ -20,5 +19,4 @@
   :plugins [[reifyhealth/lein-git-down "0.4.1"]]
   :middleware [lein-git-down.plugin/inject-properties]
   :repositories [["public-github" {:url "git://github.com"}]]
-  :git-down {marathon  {:coordinates  fsdonks/m4}
-             smiletest {:coordinates  fs-tom/krigingdemo}})
+  :git-down {marathon  {:coordinates  fsdonks/m4}})
