@@ -100,11 +100,12 @@
 ;;cannibalization demand record.
 (defn hld-cannibal-recs
   [cannibals-in-hld num-cann num-hld num-cann-hld src
-   {:keys [idaho-name] :as input-map}
+   {:keys [idaho-name
+           cannibals-in-hld?] :as input-map}
    {:keys [cannibal-start-t 
            cannibal-end-t 
-           hld-start-t 
-           hld-end-t]}]
+           idaho-start-t 
+           idaho-end-t]}]
   (let [nonbog 
         (assoc nonbog-record
                :Quantity num-cann

@@ -269,8 +269,8 @@
         filterer (fn [r] (not (contains?
                                diffs
                                (dissoc r :Quantity))))]
-    [(filter filterer previous-demands)
-     (filter filterer new-demands)]))
+    [(set (filter filterer previous-demands))
+     (set (filter filterer new-demands))]))
                                                      
 (defn consistent-supply
   "We want to make sure that our supply is the same before and after
