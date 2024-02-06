@@ -297,5 +297,3 @@ have ac forward, is our demand still the same?.")
 supply still the same at least?")
       (testing "Checking if taa capacity analysis runs complete."
         (capacity/do-taa-runs out-path input-map)))))
-
-

@@ -1,6 +1,6 @@
 (ns taa.scoring
   (:require [spork.util.table :as tbl]
-            [smiletest.core :as smile]
+            [marathon.analysis.interpolation :as interp]
             [taa.util :as util]))
 
 (defn total-fill
@@ -63,18 +63,14 @@
   {:AC-Supply "RA"
    :RC-Supply "RC"
    :src "SRC"
-   :color "Risk"
    :Total "Score"})
-
-(def tatom (atom nil))
 
 (defn interpolate
   "Interpolate between known points with the lerper, assessor, and
   maintain the src"
-  [lerper assessor [src recs]]
+  [[src recs]]
   (->>
-   (smile/interpolate-data lerper (tbl/records->table recs)
-                           :assessor assessor)
+   (interp/grid recs :AC-Supply :RC-Supply :Total)
    (map (fn [r] (assoc r :src src)))
    (map (fn [r] (clojure.set/rename-keys r rename)))))
 
@@ -84,32 +80,34 @@
    "PostSurge" 0.25
    })
 
+(defn assess [x]
+  (cond (>= x 0.95) 3
+        (>= x 0.85) 2
+        (>= x 0.60) 1
+        :else 0))
+
+(defn assess-risk [ assessor score-rec]
+  (let [score (score-rec "Score")]
+    (assoc score-rec "Risk" (assessor score))))
+  
 (defn score-results
-  "Given random run records, an assessing function to compute a
-  :Risk based on Score, and a map of :phase-name to phase-weight to
-  compute that score, returns records of {:AC :RC :Score :Risk},
-  interpolating the results between components if necessary with a
-  lerper defined in the smile namespace."
-  [run-recs & {:keys [assessor phase-weights lerper] :or
-              {assessor smile/assess
-               phase-weights default-weights
-               lerper smile/->shepard}}]
+  "Given random run records  and a map of :phase-name to phase-weight to
+  compute that score, along with an assesor function to return a risk
+  assessment of that score, returns records of {:AC :RC :Score :Risk},
+  interpolating the results between components if necessary."
+  [run-recs & {:keys [phase-weights assessor] :or
+               {phase-weights default-weights
+                assessor assess}}]
   (->> (all-scores run-recs phase-weights)
        (group-by :src)
-       (map (partial interpolate lerper assessor))
-       (reduce concat)))
+       (map interpolate)
+       (reduce concat)
+       (map (partial assess-risk assessor))))
 
 (defn scores->xlsx
-  [run-recs out-path {:keys [assessor phase-weights
-                             ]}]
+  [run-recs out-path {:keys [phase-weights assessor]}]
   ;;Might not always want to spit these risk results
   (if (and assessor phase-weights)
-    (->> (score-results run-recs :assessor assessor
-                        :phase-weights phase-weights)
+    (->> (score-results run-recs :phase-weights phase-weights
+                        :assessor assessor)
          (util/records->xlsx out-path "Sheet1"))))
-    
-       
-  
-
-  
-  

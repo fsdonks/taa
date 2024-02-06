@@ -1,7 +1,7 @@
-(defproject taa "0.0.18-SNAPSHOT"
+(defproject taa "0.0.19-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [marathon "4.2.14-SNAPSHOT"]
+                 [marathon "4.2.15-SNAPSHOT"]
                  ;[com.clojure-goes-fast/clj-memory-meter "0.2.1"]
                  ;[techascent/tech.ml.dataset "7.000-beta-2"]
                  ]
@@ -9,7 +9,7 @@
                  :timeout 120000}
 
   ;;allow testing ns and data to be resolved for transitive dep.
-  :source-paths   ["src" "test" "../m4/src/"]
+  :source-paths   ["src" "test"]
   :resource-paths ["test/resources"]
   :profiles {;;load our tests from resources just like in the uberjar
              :dev {:resource-paths ["test/resources"]
