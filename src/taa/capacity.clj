@@ -8,6 +8,7 @@
             [spork.util.excel [docjure :as doc]
              [core :as xl]]
             [demand_builder.m4plugin :as plugin]
+            [demand_builder.forgeformatter :as ff]
             [marathon.analysis.random :as random]
             [marathon.analysis :as a]
             [taa.scoring :as score]
@@ -331,6 +332,9 @@
   [percent]
   (str ":rc-unavailable " percent " "))
 
+(defn bin? [bin-forward? compo compo-check quantity]
+  (and bin-forward? (= compo compo-check) quantity))
+
 (defn tag-supply
   "Return a tag for all supply records.  Currently only binning the forward
   stationed units."
@@ -340,14 +344,15 @@
     (str
      ;;start of tag
      "{"
-    (when (and bin-forward? (= compo "RA") (not (nil? ac-forward)))
+     (when (bin? bin-forward? compo "RA" ac-forward)       
       (tag-forward ac-forward))
     ;;only going to use this tag for multiple reps for the RC so they
     ;;would have been merged into one compo.
     (when (and (= compo "USAR") merge-rc?)
       (str (tag-unavailable unavailable)
-           (when rc-forward (tag-forward rc-forward))))
-    (when (and (= compo "ARNG") ng-forward)
+           (when (and bin-forward? rc-forward)
+             (tag-forward rc-forward))))
+    (when (bin? bin-forward? compo "ARNG" ng-forward)
       (tag-forward ng-forward))
     ;;end of tag
     "}"
@@ -478,7 +483,6 @@
     (doc/load-workbook-from-resource filepath)
     (xl/as-workbook filepath)))
 
-  
 (defn load-workbook-recs
   "Given the path to an Excel workbook, each sheet as records and
   return a map of sheetname to records."
@@ -498,62 +502,16 @@
         tmp-file (java.io/file new-dir resource-filename)]
     (with-open [in (java.io/input-stream resource-file)] (java.io/copy in tmp-file))))
 
-;;save the SRC_by_day worksheet as tab delimitted text for demand
-;;builder
-(ns spork.util.excel.docjure)
-(require '[clojure.string :as string])
-
-(defn read-and-strip
-  "Turn a cell into a string with read-cell but also put the cell
-  values that have a newline in them in quotes so that it opens as tab
-  delimited in Excel properly."
-  [c]
-  (let [v (read-cell c)]
-    (when v
-      (clojure.string/replace v #"\n" "")
-      )))
-       
 (defn save-forge
   "Save the src by day worksheet as tab delimited text for demand
-  builder.  Expect SRC_By_Day to be a worksheet in the xlsx file
-  located at forege-path."
+  builder.  
+  Expect SRC_By_Day to be a worksheet of the xlsx file located at forge-path."
   [forge-path out-path]
-  (let [worksheet-rows (->> (if taa.capacity/*testing?* (load-workbook-from-resource
-                                           forge-path)
-                                (load-workbook forge-path))
-                            (select-sheet "SRC_By_Day")
-                            row-seq
-                            (map (fn [x] (if x (cell-seq x))))
-                            (map #(reduce str (interleave
-                                               (map (fn [c]
-                                                      (read-and-strip c)) %)
-                                               (repeat "\t"))))
-                            ((fn [x] (interleave x (repeat "\n"))))
-                            ;;One extra newline to remove at the end.
-                            (butlast)
-                            (reduce str))]
+  (let [worksheet-rows (->> (as-workbook forge-path)
+                            (ff/forge-xlsx->str))]
     (spit out-path worksheet-rows :append false)))
-
-(ns taa.capacity)   
-
-;;Take demand builder output and post process the demand
-;;I think this is it...
-(require 'demand_builder.forgeformatter)
-(ns demand_builder.forgeformatter)
-(defn read-forge [filename]
-  (let [l (str/split (slurp filename) #"\n")
-        formatter #(if (and (str/includes? % "TP") (str/includes? % "Day"))
-                     (read-num (str/replace (first (str/split % #"TP")) "Day " "")) %)
-        phases (str/split (first l) #"\t")
-        header (map formatter (str/split (second l) #"\t"))
-        h (count (filter #(not (number? %)) header))
-        formatted-phases (apply conj (map #(hash-map (first %) (second %))
-                                          (filter #(not= "" (first %)) (zipmap (drop h phases) (sort (filter number? header))))))
-        data (map #(str/split % #"\t") (into [] (drop 2 l)))
-        formatted-data (map #(zipmap header %) (filter #(and (>= (count %) h) (not= "" (first %))) data))]
-    {:header header :phases formatted-phases :data formatted-data}))
-(ns taa.capacity)
-
+    
+                            
 (defn replace-demand-and-supply
   "Load up a marathon workbook and replace the demand records and
   supply records."
