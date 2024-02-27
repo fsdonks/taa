@@ -508,7 +508,7 @@
   Expect SRC_By_Day to be a worksheet of the xlsx file located at forge-path."
   [forge-path out-path]
   (let [worksheet-rows (->> (as-workbook forge-path)
-                            (ff/forge-xlsx->str))]
+                            (ff/forge-wkbk->str))]
     (spit out-path worksheet-rows :append false)))
     
                             
@@ -738,7 +738,7 @@
           :let [in-path (if *testing?*
                           forge-file-name
                           (str resources-root forge-file-name))]]
-          (doc/save-forge in-path (str outputs-path "FORGE_SE-"
+          (save-forge in-path (str outputs-path "FORGE_SE-"
                                       forge-name ".txt"))))
 
 (defn preprocess-taa

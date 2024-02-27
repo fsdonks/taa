@@ -14,7 +14,7 @@
   :profiles {;;load our tests from resources just like in the uberjar
              :dev {:resource-paths ["test/resources"]
                    :jvm-opts ^:replace ["-Xmx8g"]
-                   :source-paths []
+                   :source-paths ["../demand_builder/src/"]
                    }}
   :plugins [[reifyhealth/lein-git-down "0.4.1"]]
   :middleware [lein-git-down.plugin/inject-properties]
