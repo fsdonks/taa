@@ -687,7 +687,7 @@
   (let [f (if filter? filter remove)]
     (f (fn [{:keys [SRC] :as r}]
          (contains? srcs SRC)))))
-                     
+
 (defn supply-src-filter
   [srcs filter?]
   (enable-before-transform
@@ -700,13 +700,25 @@
 
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py
-(defn spit-results [results path]
+(defn spit-results [path results]
   (random/write-output path results)
   path)
 
-(defn process-results [results-path outpath input-map]
+(defn process-results [outpath input-map results-path]
   (let [results (tbl/slurp-records results-path)]
     (score/scores->xlsx results outpath input-map)))
+
+(defn maybe-demand
+  [include-no-demand proj reps phases lower upper xs]
+  (if include-no-demand
+    (concat xs (add-no-demand proj reps phases lower upper))
+    xs))
+
+(defn unchunk [s]
+  (when (seq s)
+    (lazy-seq
+     (cons (first s)
+           (unchunk (next s))))))
 
 (defn do-taa-runs [in-path {:keys [identifier
                                    resources-root
@@ -737,18 +749,15 @@
         results-path (str out-name ".txt")
         risk-path    (str out-name "_risk.xlsx")]
     (binding [random/*threads* threads]
-      (as-> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
-                                    proj :reps reps :phases phases
-                                    :lower lower
-                                    :upper upper :compo-lengths
-                                    compo-lengths
-                                    :seed seed)
-           it
-        (if include-no-demand
-          (concat it (add-no-demand proj reps phases lower upper))
-          it)
-        (spit-results it results-path)
-        (process-results it risk-path input-map)))))
+      (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
+                                   proj :reps reps :phases phases
+                                   :lower lower
+                                   :upper upper :compo-lengths
+                                   compo-lengths
+                                   :seed seed)
+           (maybe-demand include-no-demand proj reps phases lower upper)
+           (spit-results results-path)
+           (process-results risk-path input-map)))))
 
 ;;Best way to structure taa inputs?
 ;;might use the same timeline, so keep the path specified to that and
