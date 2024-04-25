@@ -5,7 +5,7 @@
                  ;[com.clojure-goes-fast/clj-memory-meter "0.2.1"]
                  ;[techascent/tech.ml.dataset "7.000-beta-2"]
                  ]
-  :repl-options {:init-ns taa.core
+  :repl-options {#_#_:init-ns taa.core
                  :timeout 120000}
 
   ;;allow testing ns and data to be resolved for transitive dep.
