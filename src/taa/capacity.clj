@@ -345,15 +345,15 @@
      ;;start of tag
      "{"
      (when (bin? bin-forward? compo "RA" ac-forward)       
-      (tag-forward ac-forward))
-    ;;only going to use this tag for multiple reps for the RC so they
-    ;;would have been merged into one compo.
-    (when (and (= compo "USAR") merge-rc?)
-      (str (tag-unavailable unavailable)
-           (when (and bin-forward? rc-forward)
-             (tag-forward rc-forward))))
-    (when (bin? bin-forward? compo "ARNG" ng-forward)
-      (tag-forward ng-forward))
+       (tag-forward ac-forward))
+     (when (bin? bin-forward? compo "USAR" rc-forward)
+       (tag-forward rc-forward))
+     (when (bin? bin-forward? compo "ARNG" ng-forward)
+       (tag-forward ng-forward))
+     ;;only going to use this tag for multiple reps for the RC so they
+     ;;would have been merged into one compo.
+     (when (and (= compo "USAR") merge-rc?)
+       (tag-unavailable unavailable))
     ;;end of tag
     "}"
     )))
