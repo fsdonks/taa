@@ -1,8 +1,7 @@
 ;;This namespace is used to preprocess TAA inputs and do TAA runs
 ;;using inputs like those specified in the accompanying usage.clj.
 (ns taa.capacity
-  (:require [taa.patches] ;;hopefully obe.
-            [spork.util.table :as tbl]
+  (:require [spork.util.table :as tbl]
             [spork.util.clipboard :as board]
             [clojure.java.io :as java.io]
             [spork.util.io :as io]
