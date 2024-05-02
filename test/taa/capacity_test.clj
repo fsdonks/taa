@@ -32,7 +32,12 @@
 (def srcs-to-filter
   #{"01205K000"})
 
-
+(def phases 
+  [["comp" 1 821]
+   ["phase-1" 822 854]
+   ["phase-2" 855 974]
+   ["phase-3" 975 1022]
+   ["phase-4" 1023 1789]])
 
 (def input-map {;;if you want to Enabled all SupplyRecords and then
                 ;;filter those SupplyRecords, you could use
@@ -172,11 +177,7 @@
                 :periods-name "base-testdata-v7.xlsx"
                 :parameters-name "base-testdata-v7.xlsx"
                 ;;phases for results.txt
-                :phases [["comp" 1 821]
-                         ["phase-1" 822 854]
-                         ["phase-2" 855 974]
-                         ["phase-3" 975 1022]
-                         ["phase-4" 1023 1789]]
+                :phases phases
                 ;;For the most recent TAA, we
                 ;;are currently assuming that cannibalized units can't be used for anything!
                 :cannibal-start "phase-1"
