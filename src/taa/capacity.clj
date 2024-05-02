@@ -669,12 +669,6 @@
     (concat xs (add-no-demand proj reps phases lower upper))
     xs))
 
-(defn unchunk [s]
-  (when (seq s)
-    (lazy-seq
-     (cons (first s)
-           (unchunk (next s))))))
-
 (defn do-taa-runs [in-path {:keys [identifier
                                    resources-root
                                    phases
@@ -702,7 +696,10 @@
                   (random/add-transform random/adjust-cannibals []))
         out-name (str resources-root "results_" identifier)
         results-path (str out-name ".txt")
-        risk-path    (str out-name "_risk.xlsx")]
+        risk-path    (str out-name "_risk.xlsx")
+        ;;init random-out logging.
+        _ (spit "random-out.txt" "")
+        _ (println "Printing status to random-out.txt")]
     (binding [random/*threads* threads]
       (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
                                    proj :reps reps :phases phases
@@ -711,7 +708,7 @@
                                    compo-lengths
                                    :seed seed)
            (maybe-demand include-no-demand proj reps phases lower upper)
-           (spit-results results-path)
+           (spit-results results-path)s
            (process-results risk-path input-map)))))
 
 
