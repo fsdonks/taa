@@ -8,17 +8,11 @@
 
 ;;big-srcs undefined in monkey patch.
 ;;inputs-outputs-path was undefined in the monkey patch.
-(println [:WARNING '[taa.core inputs-outputs-path big-srcs computer-name] :STUBBED-WITH-PLACEHOLDERS])
-(def inputs-outputs-path "")
-(def big-srcs #{})
-(def computer-name "")
+;;moved to args where used.
+;;same with computer-name
 
-;;temporary error to prevent usage until we get this sorted out.
-(defn placeholder-error []
-  (throw (ex-info "fix placeholders!"
-            {:in [:WARNING '[taa.core inputs-outputs-path big-srcs computer-name] :STUBBED-WITH-PLACEHOLDERS]})))
 
-(defn m4-path [demand-name]
+(defn m4-path [inputs-outputs-path demand-name]
   (str inputs-outputs-path "m4_book_" demand-name ".xlsx"))
 
 (defn rc-run-prep [input-map]
@@ -29,9 +23,8 @@
          :min-distance 5
          :include-no-demand false))
 
-(defn rc-runs [input-map filter-big? comp-name demand-name i threads]
-  (placeholder-error)
-  (capacity/do-taa-runs (m4-path demand-name)
+(defn rc-runs [inputs-outputs-path big-srcs input-map filter-big? comp-name demand-name i threads]
+  (capacity/do-taa-runs (m4-path inputs-outputs-path demand-name)
     (assoc (rc-run-prep input-map)
          :transform-proj (capacity/supply-src-filter big-srcs filter-big?)
          :reps 1
@@ -72,12 +65,11 @@
 
 ;;NOTE - this should be obviated with automatic run distribution and incremental
 ;;patch.
-(defn variable-rep-runs [input-map rep-fraction rep-indices file-tag
+(defn variable-rep-runs [inputs-outputs-path computer-name input-map rep-fraction rep-indices file-tag
                          threads rc-runs?]
-  (placeholder-error)
   (let [identifier (:identifier input-map)]
     (doseq [i rep-indices]
-      (capacity/do-taa-runs (m4-path identifier)
+      (capacity/do-taa-runs (m4-path inputs-outputs-path identifier)
         (assoc (if rc-runs? (rc-run-prep input-map) input-map)
            ;;not used with :replicator
            ;;:reps num-reps
