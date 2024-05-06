@@ -698,18 +698,18 @@
         results-path (str out-name ".txt")
         risk-path    (str out-name "_risk.xlsx")
         ;;init random-out logging.
-        _ (spit "random-out.txt" "")
         _ (println "Printing status to random-out.txt")]
     (binding [random/*threads* threads]
-      (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
-                                   proj :reps reps :phases phases
-                                   :lower lower
-                                   :upper upper :compo-lengths
-                                   compo-lengths
-                                   :seed seed)
-           (maybe-demand include-no-demand proj reps phases lower upper)
-           (spit-results results-path)s
-           (process-results risk-path input-map)))))
+      (marathon.analysis.util/log-to "random-out.txt"
+        (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
+                                     proj :reps reps :phases phases
+                                     :lower lower
+                                     :upper upper :compo-lengths
+                                     compo-lengths
+                                     :seed seed)
+             (maybe-demand include-no-demand proj reps phases lower upper)
+             (spit-results results-path)
+             (process-results risk-path input-map))))))
 
 
 

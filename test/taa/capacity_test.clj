@@ -269,7 +269,7 @@
                                (dissoc r :Quantity))))]
     [(filter filterer previous-demands)
      (filter filterer new-demands)]))
-                                                     
+
 (defn consistent-supply
   "We want to make sure that our supply is the same before and after
   the multi compo forward stationing but after we add new test data
