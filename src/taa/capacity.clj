@@ -12,7 +12,11 @@
             [marathon.analysis.random :as random]
             [marathon.analysis :as a]
             [taa.scoring :as score]
-            [taa.util :as util]))
+            [taa.util :as util]
+            [marathon.processing.pre :as pre]
+            [marathon.ces.core :as core]
+            [marathon.ces.fill.scope :as scope]
+            [proc.supply :as supply]))
 
 ;;indicate that we should load resources from the jar as opposed to
 ;;the file system
@@ -95,8 +99,8 @@
       (if-let [u (unavails-branch (subs src 0 2))]
         u
         unavail-overall))))
-  
-(defn idaho+cannibal-recs 
+
+(defn idaho+cannibal-recs
   [src-rcsupply src-war-idaho src-unavails {:keys [phases
                                                   cannibal-start
                                                   cannibal-end
@@ -137,7 +141,7 @@
                      idaho-quantity (- unavail diff)]]
                                         ;(cond
                                         ;(= diff 0) [(assoc idaho-record :Quantity unavail :SRC src)]
-           
+
                                         ;(< diff 0) [(assoc idaho-record :Quantity (- unavail
                                         ;                                          diff) :SRC src)]
                                         ;:else [(assoc idaho-record :Quantity (- unavail
@@ -151,7 +155,7 @@
              ;;later if we grow rc supply.
              [nonbog]
              ;;need idaho record, too
-             [nonbog 
+             [nonbog
               (assoc (idaho-record idaho-name)
                      :Quantity idaho-quantity
                      :SRC src
@@ -210,7 +214,7 @@
      :unavails-5 unavail5
      :unavails-branch averages
      :unavail-overall average}))
-    
+
 (defn get-idaho+cannibal-recs [workbook-recs rc-supply rc-unavailable {:keys [idaho-name] :as input-map}]
   (let [src-war-idaho (->> (workbook-recs "SupplyDemand")
                            (reduce (fn [acc {:keys [SRC] :as r}]
@@ -306,7 +310,7 @@
           ;;conjs nil otherwise
           (when (not (zero? quantity))
             quantity))))
-            
+
 (defn forward-quantities
   "Returns a map of SRC to the forward stationed quantity."
   [record-map {:keys [forward-names]}]
@@ -357,7 +361,7 @@
     ;;end of tag
     "}"
     )))
-  
+
 
 ;;Need 0 quantities for a requirements
 ;;analysis record if we are binning forward
@@ -369,12 +373,12 @@
   fields are nil, replace them with 0."
   [fields recs]
   (for [r recs]
-    (reduce (fn [new-r field] 
+    (reduce (fn [new-r field]
               (if (new-r field)
                 new-r
                 (assoc new-r field 0)))
             r fields)))
-  
+
 (defn prep-edta
   "Given a record from a SupplyDemand worksheet, prep the input data
   for the edta supply risk chart"
@@ -392,8 +396,7 @@
       :T2 30
       :T3 60)
      (select-keys [:RC :RA :RC_Available :SRC :T2 :T3]) )))
-           
-                    
+
 (defn merge-rc [merge-rc? rc-unavailables {:keys [upper-rc
                                                   upper
                                                   min-distance]
@@ -504,14 +507,13 @@
 
 (defn save-forge
   "Save the src by day worksheet as tab delimited text for demand
-  builder.  
+  builder.
   Expect SRC_By_Day to be a worksheet of the xlsx file located at forge-path."
   [forge-path out-path]
   (let [worksheet-rows (->> (as-workbook forge-path)
                             (ff/forge-wkbk->str))]
     (spit out-path worksheet-rows :append false)))
-    
-                            
+
 (defn replace-demand-and-supply
   "Load up a marathon workbook and replace the demand records and
   supply records."
@@ -546,11 +548,6 @@
                                          "Parameters" parameter-table})]
     (xl/tables->xlsx out-path table-res)
     ))
-
-(require '[marathon.processing.pre :as pre] 
-         '[marathon.ces.core :as core]
-         '[marathon.ces.fill.scope :as scope]
-         '[proc.supply :as supply])
 
 (def zero-results
   {:rep-seed 0
@@ -645,7 +642,7 @@
   (let [f (if filter? filter remove)]
     (f (fn [{:keys [SRC] :as r}]
          (contains? srcs SRC)))))
-                     
+
 (defn supply-src-filter
   [srcs filter?]
   (enable-before-transform
@@ -658,6 +655,20 @@
 
 ;;Then run rand-runs on this, saving as Excursion_results.txt
 ;;then could co-locate a usage.py
+(defn spit-results [path results]
+  (random/write-output path results)
+  path)
+
+(defn process-results [outpath input-map results-path]
+  (let [results (tbl/slurp-records results-path)]
+    (score/scores->xlsx results outpath input-map)))
+
+(defn maybe-demand
+  [include-no-demand proj reps phases lower upper xs]
+  (if include-no-demand
+    (concat xs (add-no-demand proj reps phases lower upper))
+    xs))
+
 (defn do-taa-runs [in-path {:keys [identifier
                                    resources-root
                                    phases
@@ -671,11 +682,13 @@
                                    include-no-demand
                                    seed
                                    transform-proj
-                                   min-distance] :or
+                                   min-distance
+                                   conj-proj] :or
                             {seed random/+default-seed+
                              lower-rc 1 upper-rc 1
                              min-distance 0} :as input-map}]
   (let [proj (a/load-project in-path)
+        proj (merge proj conj-proj)  ;;CHANGED
         proj (-> (if transform-proj
                (a/update-proj-tables transform-proj proj)
                proj)
@@ -683,26 +696,24 @@
                   ;;but maybe this isn't standard for ac-rc random
                   ;;runs yet
                   (random/add-transform random/adjust-cannibals []))
-        results
-        (binding [random/*threads* threads]
-          (random/rand-runs-ac-rc min-distance lower-rc upper-rc
-                                  proj :reps reps :phases phases
-                                  :lower lower
-                            :upper upper :compo-lengths
-                            compo-lengths
-                            :seed seed))
-        results (if include-no-demand (concat results
-                                              (add-no-demand
-                                               proj
-                                               reps
-                                               phases
-                                               lower
-                                               upper))
-                    results)
-        out-name (str resources-root "results_" identifier)]
-    (random/write-output (str out-name ".txt") results)
-    (score/scores->xlsx results (str out-name "_risk.xlsx") input-map)
-    ))
+        out-name (str resources-root "results_" identifier)
+        results-path (str out-name ".txt")
+        risk-path    (str out-name "_risk.xlsx")
+        ;;init random-out logging.
+        _ (println "Printing status to random-out.txt")]
+    (binding [random/*threads* threads]
+      (marathon.analysis.util/log-to "random-out.txt"
+        (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
+                                     proj :reps reps :phases phases
+                                     :lower lower
+                                     :upper upper :compo-lengths
+                                     compo-lengths
+                                     :seed seed)
+             (maybe-demand include-no-demand proj reps phases lower upper)
+             (spit-results results-path)
+             (process-results risk-path input-map))))))
+
+
 
 ;;Best way to structure taa inputs?
 ;;might use the same timeline, so keep the path specified to that and
@@ -740,7 +751,6 @@
                           (str resources-root forge-file-name))]]
           (save-forge in-path (str outputs-path "FORGE_SE-"
                                       forge-name ".txt"))))
-
 (defn preprocess-taa
   "Does all of the input preprocessing for taa. Returns the path to
   the m4 workbook that was generated as a result."
@@ -804,6 +814,7 @@
 ;;supply: search for parent, child relationship
 ;;make a set of SRCs. filter that set such that if the parent
 ;;exists, so does the child.
+#_#_
 {:ParentSRC " 01300K000", :ChildSRC "01205K000"}
 
 {:ParentSRC "01300K000", :ChildSRC "01205K000"}
@@ -839,5 +850,5 @@
          found-children
          (recur (reduce clojure.set/union (for [c remaining-children] (if-let [res (m c)]
                                                                         res #{})))
-                (clojure.set/union found-children remaining-children))))]))      
+                (clojure.set/union found-children remaining-children))))]))
 
