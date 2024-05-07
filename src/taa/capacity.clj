@@ -682,11 +682,13 @@
                                    include-no-demand
                                    seed
                                    transform-proj
-                                   min-distance] :or
+                                   min-distance
+                                   conj-proj] :or
                             {seed random/+default-seed+
                              lower-rc 1 upper-rc 1
                              min-distance 0} :as input-map}]
   (let [proj (a/load-project in-path)
+        proj (merge proj conj-proj)  ;;CHANGED
         proj (-> (if transform-proj
                (a/update-proj-tables transform-proj proj)
                proj)
