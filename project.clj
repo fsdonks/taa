@@ -1,11 +1,11 @@
 (defproject taa "0.0.20-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [marathon "4e31f03" #_"4.2.15-SNAPSHOT"]
+                 [marathon "4.2.16-SNAPSHOT"]
                  ;[com.clojure-goes-fast/clj-memory-meter "0.2.1"]
                  ;[techascent/tech.ml.dataset "7.000-beta-2"]
                  ]
-  :repl-options {#_#_:init-ns taa.core
+  :repl-options {:init-ns taa.core
                  :timeout 120000}
 
   ;;allow testing ns and data to be resolved for transitive dep.
