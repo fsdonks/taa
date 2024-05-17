@@ -22,4 +22,11 @@
          :transform-proj
          (capacity/supply-src-filter #{"06465K100"} true)))
 
-;;(base-only-runs 
+(comment
+  (base-only-runs "test/resources/m4_book_Colorado_single_daily.xlsx"
+                  (assoc input-map-daily
+                         :reps 5
+                         :identifier "5-reps"
+                         :assessor nil)
+                  2))
+                                            
