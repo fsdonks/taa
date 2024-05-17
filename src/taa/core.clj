@@ -1,18 +1,20 @@
 (ns taa.core
   ;;Require both capacity and requirements here so that the user can
   ;;call functions in either from this init namespace.
-  (:require [taa [capacity :as capacity]
+  (:require [taa [capacity :as capacity] 
              [requirements :as requirements]
              [demandanalysis :as analysis]]
-            [marathon.analysis.random :as random]))
+            taa.patches.sporkio
+            [marathon.analysis.random :as random])
+  (:import [java.net InetAddress]))
 
 ;;big-srcs undefined in monkey patch.
-;;inputs-outputs-path was undefined in the monkey patch.
 ;;moved to args where used.
-;;same with computer-name
 
-
-(defn m4-path [inputs-outputs-path demand-name]
+;;Intent is for the user to rebind this and the inputs and outputs to
+;;the taa stuff is located in one directory.
+(def inputs-outputs-path "test-output/")
+(defn m4-path [demand-name]
   (str inputs-outputs-path "m4_book_" demand-name ".xlsx"))
 
 (defn rc-run-prep [input-map]
@@ -23,8 +25,8 @@
          :min-distance 5
          :include-no-demand false))
 
-(defn rc-runs [inputs-outputs-path big-srcs input-map filter-big? comp-name demand-name i threads]
-  (capacity/do-taa-runs (m4-path inputs-outputs-path demand-name)
+(defn rc-runs [big-srcs input-map filter-big? comp-name demand-name i threads]
+  (capacity/do-taa-runs (m4-path demand-name)
     (assoc (rc-run-prep input-map)
          :transform-proj (capacity/supply-src-filter big-srcs filter-big?)
          :reps 1
@@ -65,11 +67,13 @@
 
 ;;NOTE - this should be obviated with automatic run distribution and incremental
 ;;patch.
-(defn variable-rep-runs [inputs-outputs-path computer-name input-map rep-fraction rep-indices file-tag
+(defn variable-rep-runs [input-map rep-fraction rep-indices file-tag
                          threads rc-runs?]
-  (let [identifier (:identifier input-map)]
+  (let [identifier (:identifier input-map)
+        ;;Used to write output files named by the specific computer.
+        computer-name (.getHostName (InetAddress/getLocalHost))]
     (doseq [i rep-indices]
-      (capacity/do-taa-runs (m4-path inputs-outputs-path identifier)
+      (capacity/do-taa-runs (m4-path identifier)
         (assoc (if rc-runs? (rc-run-prep input-map) input-map)
            ;;not used with :replicator
            ;;:reps num-reps
