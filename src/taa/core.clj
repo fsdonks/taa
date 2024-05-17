@@ -8,6 +8,20 @@
             [marathon.analysis.random :as random])
   (:import [java.net InetAddress]))
 
+(defmacro time-s
+  "Evaluates expr and prints the time it took.  Returns the value of
+  expr. Binds the elapsed time to return-time so that we can inspect
+  it later if we lost the prn. Just a copy of clojure.core/time."
+  {:added "1.0"}
+  [expr]
+  `(let [start# (. System (nanoTime))
+         ret# ~expr
+         elapsed# (/ (double (- (. System (nanoTime))
+                       start#)) 1000000000.0)]
+     (prn (str "Elapsed time: " elapsed#  " seconds"))
+     (def returned-time elapsed#)
+     ret#))
+
 ;;big-srcs undefined in monkey patch.
 ;;moved to args where used.
 
