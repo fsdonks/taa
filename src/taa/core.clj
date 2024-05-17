@@ -4,7 +4,6 @@
   (:require [taa [capacity :as capacity] 
              [requirements :as requirements]
              [demandanalysis :as analysis]]
-            taa.patches.sporkio
             [marathon.analysis.random :as random])
   (:import [java.net InetAddress]))
 
