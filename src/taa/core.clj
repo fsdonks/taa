@@ -57,15 +57,18 @@
       :min-distance 0
       :threads threads)))
 
-(defn base-only-runs [book-path {:keys [identifier] :as input-map} threads]
-  (capacity/do-taa-runs book-path
+(defn base-only-run-prep [{:keys [identifier] :as input-map}]
     (assoc input-map
       :identifier (str identifier "-base")
       :upper 1
       :lower 1
       :upper-rc 1
       :lower-rc 1
-      :min-distance 0
+      :min-distance 0))
+
+(defn base-only-runs [book-path {:keys [identifier] :as input-map} threads]
+  (capacity/do-taa-runs book-path
+    (assoc (base-only-run-rep input-map)
       :threads threads)))
 
 ;;to do 1/4 of the reps on one machine, do rep-fraction= 1/4
