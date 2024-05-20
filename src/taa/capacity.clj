@@ -180,6 +180,8 @@
    :Operation
    :Category] )
 
+(def ^:dynamic *default-rc-ratio* 0.5)
+
 (defn unavailables
   "Given the SupplyDemand worksheet, compute the precent of rc
   unavailable by src inside of a map.  Other values in the map are the
@@ -199,8 +201,8 @@
                                :when (available-rc src)]
                            ;;new assumption to default to 0.5 here
                            [src (- 1 (if (or (zero? (available-rc src))
-                                             (zero? supply)) 0.5
-                                        (/ (int (available-rc src))
+                                             (zero? supply)) *default-rc-ratio*
+                                        (/ (available-rc src)
                                            supply)
                                         ;;stopped.  should just rescan
                                         )) ])
