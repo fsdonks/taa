@@ -27,8 +27,8 @@
 ;;Intent is for the user to rebind this and the inputs and outputs to
 ;;the taa stuff is located in one directory.
 (def inputs-outputs-path "test-output/")
-(defn m4-path [demand-name]
-  (str inputs-outputs-path "m4_book_" demand-name ".xlsx"))
+(defn m4-path [input-map demand-name]
+  (str (:resources-root input-map) "m4_book_" demand-name ".xlsx"))
 
 (defn rc-run-prep [input-map]
   (assoc input-map
@@ -39,7 +39,7 @@
          :include-no-demand false))
 
 (defn rc-runs [big-srcs input-map filter-big? comp-name demand-name i threads]
-  (capacity/do-taa-runs (m4-path demand-name)
+  (capacity/do-taa-runs (m4-path input-map demand-name)
     (assoc (rc-run-prep input-map)
          :transform-proj (capacity/supply-src-filter big-srcs filter-big?)
          :reps 1
@@ -86,7 +86,7 @@
         ;;Used to write output files named by the specific computer.
         computer-name (.getHostName (InetAddress/getLocalHost))]
     (doseq [i rep-indices]
-      (capacity/do-taa-runs (m4-path identifier)
+      (capacity/do-taa-runs (m4-path input-map identifier)
         (assoc (if rc-runs? (rc-run-prep input-map) input-map)
            ;;not used with :replicator
            ;;:reps num-reps
