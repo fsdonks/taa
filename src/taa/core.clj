@@ -16,17 +16,11 @@
   `(let [start# (. System (nanoTime))
          ret# ~expr
          elapsed# (/ (double (- (. System (nanoTime))
-                       start#)) 1000000000.0)]
+                                start#)) 1000000000.0)]
      (prn (str "Elapsed time: " elapsed#  " seconds"))
      (def returned-time elapsed#)
      ret#))
 
-;;big-srcs undefined in monkey patch.
-;;moved to args where used.
-
-;;Intent is for the user to rebind this and the inputs and outputs to
-;;the taa stuff is located in one directory.
-(def inputs-outputs-path "test-output/")
 (defn m4-path [input-map demand-name]
   (str (:resources-root input-map) "m4_book_" demand-name ".xlsx"))
 
@@ -38,38 +32,44 @@
          :min-distance 5
          :include-no-demand false))
 
+;;big-srcs is a small set of SRCs that we want to do a separate set of runs
+;;for, so that we can get the smaller inventory SRCs done first.
 (defn rc-runs [big-srcs input-map filter-big? comp-name demand-name i threads]
-  (capacity/do-taa-runs (m4-path input-map demand-name)
-    (assoc (rc-run-prep input-map)
-         :transform-proj (capacity/supply-src-filter big-srcs filter-big?)
-         :reps 1
-         :seed (rand Long/MAX_VALUE)
-         :identifier (str demand-name "_" (if filter-big? "bigs" "smalls")
-                       "-" comp-name "-" i)
-      :threads threads)))
+  (capacity/do-taa-runs
+   (m4-path input-map demand-name)
+
+   (assoc (rc-run-prep input-map)
+          :transform-proj
+          (capacity/supply-src-filter big-srcs filter-big?)
+          :reps 1
+          :seed (rand Long/MAX_VALUE)
+          :identifier (str demand-name "_" (if filter-big? "bigs" "smalls")
+                           "-" comp-name "-" i)
+          :threads threads)))
 
 (defn ra-runs [book-path input-map threads]
   (capacity/do-taa-runs book-path
-    (assoc input-map
-      :upper 1
-      :upper-rc 1
-      :lower-rc 1
-      :min-distance 0
-      :threads threads)))
+                        (assoc input-map
+                               :upper 1
+                               :lower 0
+                               :upper-rc 1
+                               :lower-rc 1
+                               :min-distance 0
+                               :threads threads)))
 
 (defn base-only-run-prep [{:keys [identifier] :as input-map}]
-    (assoc input-map
-      :identifier (str identifier "-base")
-      :upper 1
-      :lower 1
-      :upper-rc 1
-      :lower-rc 1
-      :min-distance 0))
+  (assoc input-map
+         :identifier (str identifier "-base")
+         :upper 1
+         :lower 1
+         :upper-rc 1
+         :lower-rc 1
+         :min-distance 0))
 
 (defn base-only-runs [book-path {:keys [identifier] :as input-map} threads]
   (capacity/do-taa-runs book-path
-    (assoc (base-only-run-rep input-map)
-      :threads threads)))
+                        (assoc (base-only-run-rep input-map)
+                               :threads threads)))
 
 ;;to do 1/4 of the reps on one machine, do rep-fraction= 1/4
 ;;to do those 1/4 of the reps two times, use (range 2) for the rep-indices.
@@ -83,19 +83,21 @@
 
 ;;NOTE - this should be obviated with automatic run distribution and incremental
 ;;patch.
-(defn variable-rep-runs [input-map rep-fraction rep-indices file-tag
+(defn variable-rep-runs [wkbk-path input-map rep-fraction rep-indices file-tag
                          threads rc-runs?]
   (let [identifier (:identifier input-map)
         ;;Used to write output files named by the specific computer.
         computer-name (.getHostName (InetAddress/getLocalHost))]
     (doseq [i rep-indices]
-      (capacity/do-taa-runs (m4-path input-map identifier)
-        (assoc (if rc-runs? (rc-run-prep input-map) input-map)
-           ;;not used with :replicator
-           ;;:reps num-reps
-           :conj-proj {:replicator
-                       (partial random/portion-of-reps rep-fraction)}
-           :seed (rand Long/MAX_VALUE)
-           :identifier (str identifier "_" file-tag "_"
-                         i "-" computer-name)
-           :threads threads)))))
+      (capacity/do-taa-runs
+       wkbk-path
+
+       (assoc (if rc-runs? (rc-run-prep input-map) input-map)
+              ;;not used with :replicator
+              ;;:reps num-reps
+              :conj-proj {:replicator
+                          (partial random/portion-of-reps rep-fraction)}
+              :seed (rand Long/MAX_VALUE)
+              :identifier (str identifier "_" file-tag "_"
+                               i "-" computer-name)
+              :threads threads)))))
