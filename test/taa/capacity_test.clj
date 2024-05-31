@@ -297,3 +297,24 @@ have ac forward, is our demand still the same?.")
 supply still the same at least?")
       (testing "Checking if taa capacity analysis runs complete."
         (capacity/do-taa-runs out-path input-map)))))
+
+
+(deftest cluster-test
+  (binding [capacity/*testing?* true]
+    (let [;;This will run through the taa preprocessing
+          input-map (assoc input-map :run-site :cluster)
+          out-path (capacity/preprocess-taa input-map)
+          previous-demands (consistent-demand previous-book)
+          previous-supply (consistent-supply previous-book)
+          [prev-dmd-clean new-dmd-clean] (clean-demand
+                                          previous-demands
+                                          (consistent-demand
+                                           out-path))]
+      (is (= prev-dmd-clean new-dmd-clean)
+          "After enabling multiple compos forward, if we only
+have ac forward, is our demand still the same?.")
+      (is (= previous-supply (consistent-supply out-path))
+          "After enabling multiple compos forward, is our ac
+supply still the same at least?")
+      (testing "Checking if taa capacity analysis runs complete."
+        (capacity/do-taa-runs out-path input-map)))))

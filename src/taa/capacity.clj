@@ -671,6 +671,30 @@
     (concat xs (add-no-demand proj reps phases lower upper))
     xs))
 
+(defmacro with-runsite
+  "Conditionsl binding form.  If site evals to :cluster, then
+   we require m4peer.core if it hasn't already been required,
+   and bind the *run-site* dynvar to change the replication
+   runs to be executed on the cluster.
+
+   Note: was unable to do this with binding macro out of the box,
+   since it assumes the m4peer.core/*run-site* macro exists already."
+  [site & body]
+  `(if (= ~site :cluster)
+     (let []
+       (push-thread-bindings (hash-map (requiring-resolve '~'m4peer.core/*run-site*) :cluster))
+       (try
+         ~@body
+         (finally
+           (pop-thread-bindings))))
+     ~@body))
+
+
+;;modify our input-map to recognize run-site.
+;;if run-site exists, we either have :local | :cluster.
+;;if it's :cluster, we'll try to execute on the cluster by
+;;requiring-resolve m4peer.core, binding its run-site, and
+;;then doing the runs.
 (defn do-taa-runs [in-path {:keys [identifier
                                    resources-root
                                    phases
@@ -685,7 +709,8 @@
                                    seed
                                    transform-proj
                                    min-distance
-                                   conj-proj] :or
+                                   conj-proj
+                                   run-site] :or
                             {seed random/+default-seed+
                              lower-rc 1 upper-rc 1
                              min-distance 0} :as input-map}]
@@ -704,7 +729,7 @@
         ;;init random-out logging.
         _ (println "Printing status to random-out.txt")]
     (binding [random/*threads* threads]
-      (marathon.analysis.util/log-to "random-out.txt"
+      (with-runsite run-site
         (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
                                      proj :reps reps :phases phases
                                      :lower lower
@@ -713,7 +738,17 @@
                                      :seed seed)
              (maybe-demand include-no-demand proj reps phases lower upper)
              (spit-results results-path)
-             (process-results risk-path input-map))))))
+             (process-results risk-path input-map))
+        #_(marathon.analysis.util/log-to "random-out.txt"
+          (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
+                                       proj :reps reps :phases phases
+                                       :lower lower
+                                       :upper upper :compo-lengths
+                                       compo-lengths
+                                       :seed seed)
+               (maybe-demand include-no-demand proj reps phases lower upper)
+               (spit-results results-path)
+               (process-results risk-path input-map)))))))
 
 
 
@@ -853,4 +888,3 @@
          (recur (reduce clojure.set/union (for [c remaining-children] (if-let [res (m c)]
                                                                         res #{})))
                 (clojure.set/union found-children remaining-children))))]))
-
