@@ -689,6 +689,47 @@
            (pop-thread-bindings))))
      ~@body))
 
+;;due to the way hazelcast is serializing using java's Serializable interface,
+;;we run into the case where it's creating new (Booolean. false) instances
+;;on deserialization.  This screws up our checks, e.g. in (if (:Enabled r) ...)
+;;since (Boolean. false) will be considered "truthy" by clojure, since it is
+;;NOT identical to Boolean/FALSE (the static member).
+
+;;Looked at some ways to work around this without changing anything downstream
+;;that uses those semantics (primarily for filter). So one easy way to change a
+;;project so that downstream works is to lift booleans into nil | not-nil. so
+;;even nil | :true works. or nil | :enabled. For now, when we hit the
+;;serialization barrier, we project them thusly. The MORE ideal way to do this
+;;would be to have Serializable deserialize boolean values to Boolean/FALSE.
+
+;;https://stackoverflow.com/questions/18676956/boolean-false-in-clojure
+
+(defn ensure-truthy-bools
+  "Projects any boolean column in the project's tables to nil|:true instead of
+   false|true.  Works around serialization bug, while maintainig compatibility
+   with truthiness."
+  [proj]
+  (let [tbls (proj :tables)]
+    (->> tbls
+         (reduce-kv (fn [acc nm t]
+                      (if-not (seq (get t :columns))
+                        t
+                        (let [{:keys [fields columns]} t
+                              new-cols  (reduce-kv
+                                          (fn [acc k col]
+                                            (if (and (seq col)
+                                                     (boolean? (col 0)))
+                                              (assoc acc k (mapv (fn [v] (if (boolean v)
+                                                                           :true
+                                                                           nil)) col))
+                                              acc)) columns columns)
+                          newt (if (identical? new-cols columns)
+                                   t
+                                   (assoc t :columns new-cols))]
+                        (if (identical? newt t) acc
+                            (assoc acc nm newt)))))
+                    tbls)
+         (assoc proj :tables))))
 
 ;;modify our input-map to recognize run-site.
 ;;if run-site exists, we either have :local | :cluster.
@@ -723,6 +764,7 @@
                   ;;but maybe this isn't standard for ac-rc random
                   ;;runs yet
                   (random/add-transform random/adjust-cannibals []))
+        proj (ensure-truthy-bools proj) ;;clustering fix.
         out-name (str resources-root "results_" identifier)
         results-path (str out-name ".txt")
         risk-path    (str out-name "_risk.xlsx")
