@@ -704,6 +704,8 @@
 
 ;;https://stackoverflow.com/questions/18676956/boolean-false-in-clojure
 
+;;obe...
+#_
 (defn ensure-truthy-bools
   "Projects any boolean column in the project's tables to nil|:true instead of
    false|true.  Works around serialization bug, while maintainig compatibility
@@ -764,7 +766,7 @@
                   ;;but maybe this isn't standard for ac-rc random
                   ;;runs yet
                   (random/add-transform random/adjust-cannibals []))
-        proj (ensure-truthy-bools proj) ;;clustering fix.
+        ;;proj (ensure-truthy-bools proj) ;;clustering fix.
         out-name (str resources-root "results_" identifier)
         results-path (str out-name ".txt")
         risk-path    (str out-name "_risk.xlsx")

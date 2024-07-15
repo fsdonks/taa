@@ -2,7 +2,7 @@
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [marathon "4.2.18-SNAPSHOT"]
-                 [m4peer "2a418a18de706a31eec6b804733576bb618a5181"]
+                 [m4peer "d9616d0"]
                  ;[com.clojure-goes-fast/clj-memory-meter "0.2.1"]
                  ;[techascent/tech.ml.dataset "7.000-beta-2"]
                  ]
