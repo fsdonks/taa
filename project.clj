@@ -1,8 +1,8 @@
 (defproject taa "0.0.22-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
-                 [marathon "4.2.18-SNAPSHOT"]
-                 [m4peer "d9616d082dfd27f6afa85b29c8dddfe37ef413c7"]
+                 [marathon "4.2.19-SNAPSHOT"]
+                 [m4peer "0.1.3-SNAPSHOT"]
                  ;[com.clojure-goes-fast/clj-memory-meter "0.2.1"]
                  ;[techascent/tech.ml.dataset "7.000-beta-2"]
                  ]
