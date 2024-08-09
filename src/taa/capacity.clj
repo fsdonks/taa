@@ -689,6 +689,8 @@
            (pop-thread-bindings))))
      ~@body))
 
+;;Note on serialization and true/false:
+;;=====================================
 ;;due to the way hazelcast is serializing using java's Serializable interface,
 ;;we run into the case where it's creating new (Booolean. false) instances
 ;;on deserialization.  This screws up our checks, e.g. in (if (:Enabled r) ...)
@@ -702,36 +704,15 @@
 ;;serialization barrier, we project them thusly. The MORE ideal way to do this
 ;;would be to have Serializable deserialize boolean values to Boolean/FALSE.
 
-;;https://stackoverflow.com/questions/18676956/boolean-false-in-clojure
+;;After messing with the one, we ultimately go with a better serialization option.
+;;hazeldemo.utils introduces a serialization wrapper around function args, which
+;;packs them into a byte array (via Nippy), which is then wrapped as a clojure
+;;hash-map {:contents ...} when it gets presented to hazelcast.  A corresponding
+;;unpack function can deserialize the input into clojure (via nippy), which
+;;correctly handles true/false values, and then we pack the result of the function
+;;call to send back (and ultimately unpack on the reciever).
 
-;;obe...
-#_
-(defn ensure-truthy-bools
-  "Projects any boolean column in the project's tables to nil|:true instead of
-   false|true.  Works around serialization bug, while maintainig compatibility
-   with truthiness."
-  [proj]
-  (let [tbls (proj :tables)]
-    (->> tbls
-         (reduce-kv (fn [acc nm t]
-                      (if-not (seq (get t :columns))
-                        t
-                        (let [{:keys [fields columns]} t
-                              new-cols  (reduce-kv
-                                          (fn [acc k col]
-                                            (if (and (seq col)
-                                                     (boolean? (col 0)))
-                                              (assoc acc k (mapv (fn [v] (if (boolean v)
-                                                                           :true
-                                                                           nil)) col))
-                                              acc)) columns columns)
-                          newt (if (identical? new-cols columns)
-                                   t
-                                   (assoc t :columns new-cols))]
-                        (if (identical? newt t) acc
-                            (assoc acc nm newt)))))
-                    tbls)
-         (assoc proj :tables))))
+;;https://stackoverflow.com/questions/18676956/boolean-false-in-clojure
 
 ;;modify our input-map to recognize run-site.
 ;;if run-site exists, we either have :local | :cluster.
