@@ -2,7 +2,7 @@
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [marathon "4.2.20-SNAPSHOT"]
-                 [m4peer "e402bdc29e842ed762c33cc34f3aca27a231a73a" #_"0.1.5-SNAPSHOT"]
+                 [m4peer   "0.1.8-SNAPSHOT"]
                  ]
   :repl-options {:init-ns taa.core}
 
