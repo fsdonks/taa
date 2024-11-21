@@ -16,7 +16,9 @@
             [marathon.processing.pre :as pre]
             [marathon.ces.core :as core]
             [marathon.ces.fill.scope :as scope]
-            [proc.supply :as supply]))
+            [proc.supply :as supply]
+            [m4peer.core :as peer]
+            ))
 
 ;;indicate that we should load resources from the jar as opposed to
 ;;the file system
@@ -671,6 +673,22 @@
     (concat xs (add-no-demand proj reps phases lower upper))
     xs))
 
+;;updated with-runsite.
+(defmacro with-runsite [site & body]
+  "Conditionsl binding form.  If site evals to :cluster, then
+   we require m4peer.core if it hasn't already been required,
+   and bind the *run-site* dynvar to change the replication
+   runs to be executed on the cluster.
+
+   Note: was unable to do this with binding macro out of the box,
+   since it assumes the m4peer.core/*run-site* macro exists already."
+  `(if (= ~site :cluster)
+     (binding [m4peer.core/*run-site* :cluster]
+       (m4peer.core/with-cluster-logging :random-out
+         ~@body))
+     (marathon.analysis.util/log-to "random-out.txt" ~@body)))
+
+#_
 (defmacro with-runsite
   "Conditionsl binding form.  If site evals to :cluster, then
    we require m4peer.core if it hasn't already been required,
@@ -763,17 +781,18 @@
                                      :seed seed)
              (maybe-demand include-no-demand proj reps phases lower upper)
              (spit-results results-path)
-             (process-results risk-path input-map))
-        #_(marathon.analysis.util/log-to "random-out.txt"
-          (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
-                                       proj :reps reps :phases phases
-                                       :lower lower
-                                       :upper upper :compo-lengths
-                                       compo-lengths
-                                       :seed seed)
-               (maybe-demand include-no-demand proj reps phases lower upper)
-               (spit-results results-path)
-               (process-results risk-path input-map)))))))
+             (process-results risk-path input-map))))))
+
+  #_(marathon.analysis.util/log-to "random-out.txt"
+      (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
+                                   proj :reps reps :phases phases
+                                   :lower lower
+                                   :upper upper :compo-lengths
+                                   compo-lengths
+                                   :seed seed)
+           (maybe-demand include-no-demand proj reps phases lower upper)
+           (spit-results results-path)
+           (process-results risk-path input-map)))
 
 
 

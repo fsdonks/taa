@@ -1,10 +1,8 @@
-(defproject taa "0.0.23-SNAPSHOT"
+(defproject taa "0.0.24-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [marathon "4.2.20-SNAPSHOT"]
-                 [m4peer "7ff41c84f9606541f00afdb4502a3369f80d9a59" #_"0.1.4-SNAPSHOT"]
-                 ;[com.clojure-goes-fast/clj-memory-meter "0.2.1"]
-                 ;[techascent/tech.ml.dataset "7.000-beta-2"]
+                 [m4peer "e402bdc29e842ed762c33cc34f3aca27a231a73a" #_"0.1.5-SNAPSHOT"]
                  ]
   :repl-options {:init-ns taa.core}
 
