@@ -688,25 +688,6 @@
          ~@body))
      (marathon.analysis.util/log-to "random-out.txt" ~@body)))
 
-#_
-(defmacro with-runsite
-  "Conditionsl binding form.  If site evals to :cluster, then
-   we require m4peer.core if it hasn't already been required,
-   and bind the *run-site* dynvar to change the replication
-   runs to be executed on the cluster.
-
-   Note: was unable to do this with binding macro out of the box,
-   since it assumes the m4peer.core/*run-site* macro exists already."
-  [site & body]
-  `(if (= ~site :cluster)
-     (let []
-       (push-thread-bindings (hash-map (requiring-resolve '~'m4peer.core/*run-site*) :cluster))
-       (try
-         ~@body
-         (finally
-           (pop-thread-bindings))))
-     ~@body))
-
 ;;Note on serialization and true/false:
 ;;=====================================
 ;;due to the way hazelcast is serializing using java's Serializable interface,
@@ -737,27 +718,14 @@
 ;;if it's :cluster, we'll try to execute on the cluster by
 ;;requiring-resolve m4peer.core, binding its run-site, and
 ;;then doing the runs.
-(defn do-taa-runs [in-path {:keys [identifier
-                                   resources-root
-                                   phases
-                                   compo-lengths
-                                   reps
-                                   lower
-                                   lower-rc
-                                   upper
-                                   upper-rc
-                                   threads
-                                   include-no-demand
-                                   seed
-                                   transform-proj
-                                   min-distance
-                                   conj-proj
-                                   run-site] :or
-                            {seed random/+default-seed+
-                             lower-rc 1 upper-rc 1
-                             min-distance 0} :as input-map}]
+(defn do-taa-runs
+  [in-path {:keys [identifier resources-root phases compo-lengths reps lower
+                   lower-rc upper upper-rc threads include-no-demand seed
+                   transform-proj min-distance conj-proj run-site]
+            :or {seed random/+default-seed+ lower-rc 1 upper-rc 1
+                 min-distance 0} :as input-map}]
   (let [proj (a/load-project in-path)
-        proj (merge proj conj-proj)  ;;CHANGED
+        proj (merge proj conj-proj)
         proj (-> (if transform-proj
                (a/update-proj-tables transform-proj proj)
                proj)
@@ -782,19 +750,6 @@
              (maybe-demand include-no-demand proj reps phases lower upper)
              (spit-results results-path)
              (process-results risk-path input-map))))))
-
-  #_(marathon.analysis.util/log-to "random-out.txt"
-      (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
-                                   proj :reps reps :phases phases
-                                   :lower lower
-                                   :upper upper :compo-lengths
-                                   compo-lengths
-                                   :seed seed)
-           (maybe-demand include-no-demand proj reps phases lower upper)
-           (spit-results results-path)
-           (process-results risk-path input-map)))
-
-
 
 ;;Best way to structure taa inputs?
 ;;might use the same timeline, so keep the path specified to that and
