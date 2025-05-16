@@ -4,6 +4,7 @@
                  [marathon "4.2.20-SNAPSHOT"]
                  [m4peer   "0.1.9-SNAPSHOT"]
                  ]
+  #_#_
   :repl-options {:init-ns taa.core}
 
   ;;allow testing ns and data to be resolved for transitive dep.
