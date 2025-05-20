@@ -12,7 +12,7 @@
   :resource-paths ["test/resources"]
   :profiles {;;load our tests from resources just like in the uberjar
              :dev {:resource-paths ["test/resources"]
-                   :jvm-opts ^:replace ["-Xmx8g"]
+                   :jvm-opts ^:replace ["-Xmx8g" "-XX:+UseParallelGC"]
                    :source-paths []
                    }}
   :plugins [[reifyhealth/lein-git-down "0.4.1"]]
