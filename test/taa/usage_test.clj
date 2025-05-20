@@ -8,7 +8,7 @@
             [marathon.analysis.random :as random]
             [demand_builder.forgeformatter :as ff]
             [spork.util [io :as io]]))
-
+(comment
 ;;note - original script assumed in-ns taa.core, so we are
 ;;slightly complicating this but meh.
 
@@ -307,3 +307,4 @@
 ;; - 1-n
 ;; - shave charts
 ;; - tsunami charts
+)
