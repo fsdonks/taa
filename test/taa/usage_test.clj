@@ -8,13 +8,18 @@
             [marathon.analysis.random :as random]
             [demand_builder.forgeformatter :as ff]
             [spork.util [io :as io]]))
-(comment
+
+(comment ;;wip for exploring projects.
+  (require '[portal.api :as p])
+  (def p (p/open {:app false})) ;;use the system browser
+  (add-tap #'p/submit)
+  )
 ;;note - original script assumed in-ns taa.core, so we are
 ;;slightly complicating this but meh.
 
-
-(def inputs-outputs-path (io/file-path "some-path-to-root"))
-(def src-str-branch  (io/file-path "path-to-strength-and-src-file"))
+;;This is the root path to our project.
+(def inputs-outputs-path (io/file-path "~/"))
+(def src-str-branch  (io/file-path inputs-outputs-path "notional.xlsx"))
 
 ;;How to prep input data:
 ;;modifications to SupplyDemand
@@ -55,16 +60,11 @@
 (def vignettes-AP (conj vignettes "Alpha_Residual"))
 (def vignettes-BP (conj vignettes "Beta_Residual"))
 
+;;currently expects a worbook with a sigle spreadsheet.
+;;multisheet books aren't supported (could be).
+;;I'm pretts sure the values are path-relative to project root.
 (def forge-AP {"A" "FORGE_A.xlsx"})
 (def forge-BP {"B" "FORGE_B.xlsx"})
-
-;;ex. automated version of below
-(comment
-  (def phases-AP
-    (concat [["comp1" 1 1334]]
-            (ff/pocessed-phases-from
-             (io/file-path inputs-outputs-path (-> forge-AP vals first)))
-            [["comp2" 2316 3649]])))
 
 (def phases-AP
   [["comp1" 1 1334]
@@ -74,14 +74,6 @@
    ["phase4" 1536 2315]
    ["comp2"  2316 3649]])
 
-;;ex. automated version of below
-(comment
-  (def phases-BP
-    (concat [["comp1" 1 1334]]
-            (ff/pocessed-phases-from
-             (io/file-path inputs-outputs-path (-> forge-BP vals first)))
-            [["comp2" 2316 3649]])))
-
 (def phases-BP
   [["comp1" 1 1334]
    ["phase1" 1335 1340]
@@ -89,6 +81,29 @@
    ["phase3" 1346 1435]
    ["phase4" 1436 2315]
    ["comp2"  2316 3649]])
+
+;;ex. automated version of above, could be useful for other
+;;usage scripts.
+(comment
+  (defn transform [start stop xs]
+    (let [shifted  (->> xs
+                        (mapv (fn [[k l r]] [k (+ l start) (+ r start)])))]
+      (update shifted (dec (count shifted)) assoc 2 stop)))
+
+  (def phases-AP
+    (concat [["comp1" 1 1334]]
+            (transform 1334 2315
+                       (ff/processed-phases-from
+                        (io/file-path inputs-outputs-path
+                                      (-> forge-AP vals first))))
+            [["comp2" 2316 3649]]))
+  (def phases-BP
+    (concat [["comp1" 1 1334]]
+            (transform 1334 2315
+             (ff/processed-phases-from
+              (io/file-path inputs-outputs-path
+                            (-> forge-BP vals first))))
+            [["comp2" 2316 3649]])))
 
 ;;NOTE - we can define a helper to avoid having to recompute these.
 ;;as well as allowing us to interpret inputs like a descending vector of threshold->weight...
@@ -114,7 +129,7 @@
     "55508KA00"
     "41750K000"})
 
-(def curr-supply-demand "supplydemand.xlsx")
+(def curr-supply-demand "notional.xlsx")
 
 (def input-map-AP
   {:resources-root inputs-outputs-path
@@ -219,6 +234,7 @@
    :forward-names forward-map
    :merge-rc? true})
 
+(comment
 ;;Parameters are the same as AP since policies and 4a timings are the same.
 ;;policy-map-name and default-rc policy are also the same as AP for the same
 ;;reasons.
