@@ -18,7 +18,8 @@
 ;;slightly complicating this but meh.
 
 ;;This is the root path to our project.
-(def inputs-outputs-path (io/file-path "~/"))
+;;tbd, change to resolve res.
+(def inputs-outputs-path (io/file-path "./resources/usage"))
 (def src-str-branch  (io/file-path inputs-outputs-path "notional.xlsx"))
 
 ;;How to prep input data:
@@ -234,7 +235,6 @@
    :forward-names forward-map
    :merge-rc? true})
 
-(comment
 ;;Parameters are the same as AP since policies and 4a timings are the same.
 ;;policy-map-name and default-rc policy are also the same as AP for the same
 ;;reasons.
@@ -249,10 +249,66 @@
          :periods-name "periods_BP.xlsx"))
 
 ;;rc will get tacked on for rc runs
-(def deamnd-names ["AP" "BP"])
+(def demand-names ["AP" "BP"])
 (def path-AP (core/m4-path input-map-AP "AP"))
 (def path-BP (core/m4-path input-map-BP "BP"))
 
+;;builds workbook.
+(defn build-them []
+  (binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-AP))
+  (binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-BP)))
+
+;;does a single rep of capacity analysis
+#_#_
+(core/time-s (marathon.core/capacity-analysis path-AP))
+(core/time-s (marathon.core/capacity-analysis path-BP))
+
+;;Do only the RA variation with fixed rc for the 1-n list.
+;;We are now doing variable reps according to the ra+rc inventory.
+;;20 indicates the number of logical processors which shold match
+;;what you have for you logical processors in task manager.
+#_#_
+(core/time-s (core/variable-rep-runs path-AP input-map-AP 1 (range 1) "ra" 24 false))
+(core/time-s (core/variable-rep-runs path-BP input-map-BP 1 (range 1) "ra" 24 false))
+
+;;if you only want to run some SRCS for the 1-n list, do this:
+#_
+(def src-fixes
+  #{"44335K000"
+    "10633P000"})
+
+;;redo ra supply variation for 1-n runs
+#_
+(core/time-s
+ (core/variable-rep-runs path-AP
+    (assoc input-map-AP
+           :transform-proj (capacity/supply-src-filter src-fixes true))
+    1
+    (range 1)
+    "ra-rc50_updates"
+    24
+    ;;false for no, don't do ra*rc
+    false))
+#_
+(core/time-s
+ (core/variable-rep-runs path-BP
+                         (assoc input-map-BP
+                                :transform-proj(capacity/supply-src-filter src-fixes true))
+                         1
+                         (range 1)
+                         "ra-rc50_updates"
+                         24
+                         ;;false for no, don't do ra*rc
+                         false))
+
+
+;;add taa post processing
+;; - marathon performance data
+;; - 1-n
+;; - shave charts
+;; - tsunami charts
+
+(comment
 ;;This code is used to spit out results for each day where
 ;;we treat each day as an individual phase.
 (defn daily-phases [[phase start end]]
@@ -275,52 +331,5 @@
 
 ;;this code is for doing tsunami charts (OBE, see new version).
 
-;;builds workbook.
-(binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-AP))
-(binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-BP))
 
-;;does a single rep of capacity analysis
-(core/time-s (marathon.core/capacity-analysis path-AP))
-(core/time-s (marathon.core/capacity-analysis path-BP))
-
-;;Do only the RA variation with fixed rc for the 1-n list.
-;;We are now doing variable reps according to the ra+rc inventory.
-;;20 indicates the number of logical processors which shold match
-;;what you have for you logical processors in task manager.
-(core/time-s (core/variable-rep-runs path-AP input-map-AP 1 (range 1) "ra" 24 false))
-(core/time-s (core/variable-rep-runs path-BP input-map-BP 1 (range 1) "ra" 24 false))
-
-;;if you only want to run some SRCS for the 1-n list, do this:
-(def src-fixes
-  #{"44335K000"
-    "10633P000"})
-
-;;redo ra supply variation for 1-n runs
-(core/time-s
- (core/variable-rep-runs path-AP
-    (assoc input-map-AP
-           :transform-proj(capacity/supply-src-filter src-fixes true))
-    1
-    (range 1)
-    "ra-rc50_updates"
-    24
-    ;;false for no, don't do ra*rc
-    false))
-
-(core/time-s
- (core/variable-rep-runs path-BP
-                         (assoc input-map-BP
-                                :transform-proj(capacity/supply-src-filter src-fixes true))
-                         1
-                         (range 1)
-                         "ra-rc50_updates"
-                         24
-                         ;;false for no, don't do ra*rc
-                         false))
-
-;;add taa post processing
-;; - marathon performance data
-;; - 1-n
-;; - shave charts
-;; - tsunami charts
 )

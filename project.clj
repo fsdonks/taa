@@ -1,4 +1,4 @@
-(defproject taa "0.0.25-SNAPSHOT"
+(defproject taa "0.0.26-SNAPSHOT"
   :description "FIXME: write description"
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [marathon "4.2.20-SNAPSHOT"]
