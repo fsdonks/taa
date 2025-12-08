@@ -150,6 +150,8 @@
                         "CRE" 2
                         ;;comp stuff
                         "Forward Stationing" 1
+                        ;;cannibalization
+                        "RC_NonBOG-War" 1
                         ;;"CampForwardRC" 2
                         "Rotational" 5
                         ;;after fowrard and before rotational
@@ -164,6 +166,7 @@
                            ;;"CampForwardRC" "NOT-AC"
                            "IRF" "NOT-RC"
                            "CRF" "NOT-RC"
+                           SourceFirst
                            )
             :Tags (if (contains? forward-names Vignette)
                      (str {:region :forward})
@@ -230,7 +233,6 @@
 ;;builds workbook.
 (defn build-them []
   (binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-AP))
-  #_
   (binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-BP)))
 
 ;;does a single rep of capacity analysis

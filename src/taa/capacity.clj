@@ -213,13 +213,15 @@
                                :when (or (available-rc src)
                                          *default-rc-ratio*)]
                            ;;new assumption to default to 0.5 here
-                           [src (- 1 (if (or (zero? (available-rc src))
-                                             (zero? supply))
-                                       *default-rc-ratio*
-                                        (/ (available-rc src)
-                                            supply)
-                                        ;;stopped.  should just rescan
-                                        )) ])
+
+                           ;;src-available has to exist, has to be non-zero, and the supply has to be non-zero.
+                           (let [avail (available-rc src  0)]
+                             [src (- 1 (if (or (zero? avail)
+                                               (zero? supply))
+                                         *default-rc-ratio*
+                                         (/ avail supply)
+                                         ;;stopped.  should just rescan
+                                         )) ]))
                         (into {} ) )
         unavail5 (into {} (map (fn [ [s unavail]] [ (subs s 0 5)
                                                    unavail]) rc-unavail))
