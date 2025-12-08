@@ -4,6 +4,7 @@
   (:require [taa [capacity :as capacity] 
              [requirements :as requirements]
              [demandanalysis :as analysis]]
+            [spork.util [io :as io]]
             [marathon.analysis.random :as random])
   (:import [java.net InetAddress]))
 
@@ -22,7 +23,7 @@
      ret#))
 
 (defn m4-path [input-map demand-name]
-  (str (:resources-root input-map) "m4_book_" demand-name ".xlsx"))
+  (io/file-path (:resources-root input-map) (str "m4_book_" demand-name ".xlsx")))
 
 (defn rc-run-prep [input-map]
   (assoc input-map

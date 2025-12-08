@@ -184,6 +184,15 @@
 
 (def ^:dynamic *default-rc-ratio* 0.5)
 
+;;Extant version of this "was" mildly assed up.  It acts like you
+;;have the option to provide an RCAvailable column in the SupplyDemand
+;;workbook, then craps out if it's not found since it drives into
+;;a divide by 0 error (count of records is 0 etc.)
+;;So we need to actually substitute the RC available default
+;;as was originally intended.  I think we can flex this to allow
+;;the presence of RCAvailable or not.  That's mildly lame now that
+;;I think about it, but meh.  We'll allow data-driven column presence,
+;;or the more useful default-rc-ratio.
 (defn unavailables
   "Given the SupplyDemand worksheet, compute the precent of rc
   unavailable by src inside of a map.  Other values in the map are the
@@ -196,16 +205,19 @@
                                     (if (number? RCAvailable)
                                       (assoc acc SRC RCAvailable)
                                       acc) ) {}))
+
          rc-unavail (->> (for [[src supply] rc-supply
                               ;;when we have a available number for the src
                               ;;otherwise, this will defer to
                               ;;idaho+cannibal-recs to find unavailable
-                               :when (available-rc src)]
+                               :when (or (available-rc src)
+                                         *default-rc-ratio*)]
                            ;;new assumption to default to 0.5 here
                            [src (- 1 (if (or (zero? (available-rc src))
-                                             (zero? supply)) *default-rc-ratio*
+                                             (zero? supply))
+                                       *default-rc-ratio*
                                         (/ (available-rc src)
-                                           supply)
+                                            supply)
                                         ;;stopped.  should just rescan
                                         )) ])
                         (into {} ) )
@@ -255,7 +267,7 @@
               (select-keys r (concat [:SRC :UNTDS]
                                      (map keyword vignette-names)))))
        (get-vignettes)
-       (util/records->xlsx (str out-dir
+       (util/records->xlsx (io/file-path out-dir
                            "vignettes.xlsx") "Sheet1")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -734,7 +746,7 @@
                   ;;runs yet
                   (random/add-transform random/adjust-cannibals []))
         ;;proj (ensure-truthy-bools proj) ;;clustering fix.
-        out-name (str resources-root "results_" identifier)
+        out-name (io/file-path resources-root (str "results_" identifier))
         results-path (str out-name ".txt")
         risk-path    (str out-name "_risk.xlsx")
         ;;init random-out logging.
@@ -772,21 +784,20 @@
            timeline-name
            forge-files] :as input-map}]
   ;;setup
-  (io/make-folders! (str builder-inputs-path "/Outputs/"))
+  (io/make-folders! (io/file-path  builder-inputs-path "Outputs"))
   (vignettes-to-file (workbook-recs "SupplyDemand") vignettes
                               builder-inputs-path)
   ;;move the timeline to this directory (copy)
   (if *testing?*
     (copy-resource! timeline-name builder-inputs-path)
-    (copy-file (str resources-root timeline-name) (str
-                                                   builder-inputs-path
-                                                   "timeline.xlsx")))
+    (copy-file (io/file-path resources-root timeline-name)
+               (io/file-path builder-inputs-path "timeline.xlsx")))
   (doseq [[forge-name forge-file-name] forge-files
           :let [in-path (if *testing?*
                           forge-file-name
-                          (str resources-root forge-file-name))]]
-          (save-forge in-path (str outputs-path "FORGE_SE-"
-                                      forge-name ".txt"))))
+                          (io/file-path resources-root forge-file-name))]]
+          (save-forge in-path (io/file-path outputs-path
+                                            (str "FORGE_SE-" forge-name ".txt")))))
 (defn preprocess-taa
   "Does all of the input preprocessing for taa. Returns the path to
   the m4 workbook that was generated as a result."
@@ -807,33 +818,32 @@
            periods-name
            parameters-name] :as input-map}]
   (let [in-root (if *testing?* "" resources-root)
-        supp-demand-path (str in-root supp-demand-name)
-        policy-map-path (str in-root policy-map-name)
+        supp-demand-path (io/file-path in-root supp-demand-name)
+        policy-map-path (io/file-path in-root policy-map-name)
         input-map (assoc input-map :supp-demand-path supp-demand-path)
-        base-m4-path (str in-root base-m4-name)
+        base-m4-path (io/file-path in-root base-m4-name)
         workbook-recs {"SupplyDemand" ((load-workbook-recs
                                         supp-demand-path) "SupplyDemand")
                        "policy_map" (first (vals (load-workbook-recs
                                                   policy-map-path)))}
-        builder-inputs-path (str resources-root identifier "_inputs/")
-        outputs-path (str builder-inputs-path "/Outputs/")
+        builder-inputs-path (io/file-path resources-root (str identifier "_inputs"))
+        outputs-path (io/file-path builder-inputs-path "Outputs")
         ;;and place in
         ;;the Excursion_m4_workbook.xlsx
-        out-path (str resources-root "/m4_book_" identifier
-                      ".xlsx")]
+        out-path (io/file-path resources-root (str "m4_book_" identifier ".xlsx"))]
     ;;setup files for demand builder
     (prep-builder-files builder-inputs-path workbook-recs
                         outputs-path input-map)
     ;;run demand builder
     (plugin/root->demand-file builder-inputs-path)
     ;;create a new m4 workbook, replacing the demand and supply worksheets
-    (replace-demand-and-supply base-m4-path (str outputs-path
+    (replace-demand-and-supply base-m4-path (io/file-path outputs-path
                                                  "Outputs_DEMAND.txt")
                                supp-demand-path out-path workbook-recs
                                default-rc-policy
                                set-demand-params
-                               (str in-root periods-name)
-                               (str in-root parameters-name)
+                               (io/file-path in-root periods-name)
+                               (io/file-path in-root parameters-name)
                                input-map)
     out-path
     ))

@@ -1,7 +1,7 @@
 ;;This is a port of a recent working example.
 ;;We generalize where necessary.
 (ns taa.usage-test
-  (:require [taa [core :as taa]
+  (:require [taa [core :as core]
                  [capacity :as capacity]
                  [requirements :as requirements]
                  [demandanalysis :as analysis]]
@@ -9,17 +9,12 @@
             [demand_builder.forgeformatter :as ff]
             [spork.util [io :as io]]))
 
-(comment ;;wip for exploring projects.
-  (require '[portal.api :as p])
-  (def p (p/open {:app false})) ;;use the system browser
-  (add-tap #'p/submit)
-  )
 ;;note - original script assumed in-ns taa.core, so we are
 ;;slightly complicating this but meh.
 
 ;;This is the root path to our project.
 ;;tbd, change to resolve res.
-(def inputs-outputs-path (io/file-path "./resources/usage"))
+(def inputs-outputs-path (io/file-path "./test/resources/usage"))
 (def src-str-branch  (io/file-path inputs-outputs-path "notional.xlsx"))
 
 ;;How to prep input data:
@@ -67,6 +62,8 @@
 (def forge-AP {"A" "FORGE_A.xlsx"})
 (def forge-BP {"B" "FORGE_B.xlsx"})
 
+;;Phase definitions
+
 (def phases-AP
   [["comp1" 1 1334]
    ["phase1" 1335 1380]
@@ -82,29 +79,6 @@
    ["phase3" 1346 1435]
    ["phase4" 1436 2315]
    ["comp2"  2316 3649]])
-
-;;ex. automated version of above, could be useful for other
-;;usage scripts.
-(comment
-  (defn transform [start stop xs]
-    (let [shifted  (->> xs
-                        (mapv (fn [[k l r]] [k (+ l start) (+ r start)])))]
-      (update shifted (dec (count shifted)) assoc 2 stop)))
-
-  (def phases-AP
-    (concat [["comp1" 1 1334]]
-            (transform 1334 2315
-                       (ff/processed-phases-from
-                        (io/file-path inputs-outputs-path
-                                      (-> forge-AP vals first))))
-            [["comp2" 2316 3649]]))
-  (def phases-BP
-    (concat [["comp1" 1 1334]]
-            (transform 1334 2315
-             (ff/processed-phases-from
-              (io/file-path inputs-outputs-path
-                            (-> forge-BP vals first))))
-            [["comp2" 2316 3649]])))
 
 ;;NOTE - we can define a helper to avoid having to recompute these.
 ;;as well as allowing us to interpret inputs like a descending vector of threshold->weight...
@@ -200,7 +174,7 @@
    :timeline-name "timeline_A.xlsx"
    :forge-files forge-AP
    ;;the name of the base marathon file that exists in the resources path.
-   :base-m4-name "base_m4book.xlsx"
+   :base-m4-name "m4base.xlsx"
    ;;phases for results.txt
    :phases phases-AP
    ;;need to change these manually right now for the cannibal and idaho
@@ -243,7 +217,7 @@
   (assoc input-map-AP
          :timeline-name "timeline_B.xlsx"
          :phases phases-BP
-         :vignettes vignettes-B
+         :vignettes vignettes-BP
          :identifier "BP"
          :forge-files forge-BP
          :periods-name "periods_BP.xlsx"))
@@ -256,6 +230,7 @@
 ;;builds workbook.
 (defn build-them []
   (binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-AP))
+  #_
   (binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-BP)))
 
 ;;does a single rep of capacity analysis
@@ -333,3 +308,33 @@
 
 
 )
+
+;;ex. automated version of Phase definitions, could be useful for other
+;;usage scripts.
+(comment
+  (defn transform [start stop xs]
+    (let [shifted  (->> xs
+                        (mapv (fn [[k l r]] [k (+ l start) (+ r start)])))]
+      (update shifted (dec (count shifted)) assoc 2 stop)))
+
+  (def phases-AP
+    (concat [["comp1" 1 1334]]
+            (transform 1334 2315
+                       (ff/processed-phases-from
+                        (io/file-path inputs-outputs-path
+                                      (-> forge-AP vals first))))
+            [["comp2" 2316 3649]]))
+  (def phases-BP
+    (concat [["comp1" 1 1334]]
+            (transform 1334 2315
+                       (ff/processed-phases-from
+                        (io/file-path inputs-outputs-path
+                                      (-> forge-BP vals first))))
+            [["comp2" 2316 3649]])))
+
+
+(comment ;;wip for exploring projects.
+  (require '[portal.api :as p])
+  (def p (p/open {:app false})) ;;use the system browser
+  (add-tap #'p/submit)
+  )
