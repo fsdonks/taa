@@ -5,6 +5,9 @@
                  [capacity :as capacity]
                  [requirements :as requirements]
                  [demandanalysis :as analysis]]
+            [taapost [shave :as shave]
+                     [bcd   :as bcd]
+                     [nlist :as nlist]]
             [marathon.analysis.random :as random]
             [demand_builder.forgeformatter :as ff]
             [spork.util [io :as io]]))
@@ -280,7 +283,7 @@
 
 
 ;;add taa post processing
-;; - marathon performance data
+;; - marathon performance data (bcd)
 ;; - 1-n
 ;; - shave charts
 ;; - tsunami charts

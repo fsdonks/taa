@@ -84,7 +84,8 @@
 
 ;;NOTE - this should be obviated with automatic run distribution and incremental
 ;;patch.
-(defn variable-rep-runs [wkbk-path input-map rep-fraction rep-indices file-tag
+(defn variable-rep-runs
+  [wkbk-path input-map rep-fraction rep-indices file-tag
                          threads rc-runs?]
   (let [identifier (:identifier input-map)
         ;;Used to write output files named by the specific computer.
@@ -102,3 +103,43 @@
               :identifier (str identifier "_" file-tag "_"
                                i "-" computer-name)
               :threads threads)))))
+
+
+
+;;Number of reps are based on Sarah's rep analysis
+;;copied here for explicitness.
+(defn rep-count [ra+rc] ;;
+  (cond                 ;;
+    (> ra+rc 100) 10    ;;
+    (> ra+rc 46) 20     ;;
+    (> ra+rc 12) 30     ;;
+    (> ra+rc 5) 80      ;;
+    (> ra+rc 0) 100     ;;
+    (zero? ra+rc) 1))   ;;
+
+;;this is pulled from marathon.analysis.random and refactored forg
+;;explicitness, instead of having it stowed away elsewhere.
+(defn variable-reps [proj]
+  (->> (random/total-supply proj)
+       (rep-count)))
+
+;;This is a consolidated API function that cleans up the vagaries of doing
+;;variable rep runs, constant rep runs, sparse runs, etc.
+;;We want to clean up the current split between legacy/deprecated functions.
+;;We had taa.capacity/do-taa-runs, then craig wrapped it to enable partial/fractional
+;;runs while simultaneously implementing the variable rep strategy from sarah.
+;;papers over the minutae of placing replicator function in the right place,
+;;optional thread overloads, etc.
+#_
+(defn taa-runs [wbkpath input-map &
+                {:keys [project->reps rc-runs? threads] :as opts}]
+  (capacity/do-taa-runs
+   wkbk-path
+   (assoc (if rc-runs? (rc-run-prep input-map) input-map) ;;this is just supplementary junk IMO.
+          ;;not used with :replicator
+          ;;:reps num-reps
+          :conj-proj {:replicator  project->reps}
+          :seed       (rand Long/MAX_VALUE)
+          :identifier (str identifier "_" file-tag "_"
+                           i "-" computer-name)
+          :threads threads)))

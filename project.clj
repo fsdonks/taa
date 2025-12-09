@@ -3,9 +3,11 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [marathon "4.2.20-SNAPSHOT"]
                  [m4peer   "0.1.2-BETA"]
-                 [taapost "1f2ae57d018a9cba3453fd7e4e2af02927bf8753" #_"0.1.2-SNAPSHOT"
+                 [taapost "582987dd9de2dc0c37b6e06d705fb9d3282788ea" #_"0.1.2-SNAPSHOT"
                   #_#_:exclusions [jfree/jfreechart jfree/jfreechart com.taoensso/nippy
                                commons-codec]]
+                 ;;override marathon's.  we should ditch the one in m4.
+                 [com.cnuernber/ham-fisted "2.035"]
                  ]
   #_#_
   :repl-options {:init-ns taa.core}
