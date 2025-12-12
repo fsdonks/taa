@@ -119,7 +119,7 @@
 
 ;;this is pulled from marathon.analysis.random and refactored forg
 ;;explicitness, instead of having it stowed away elsewhere.
-(defn variable-reps [proj]
+(defn project->variable-reps [proj]
   (->> (random/total-supply proj)
        (rep-count)))
 
@@ -130,9 +130,38 @@
 ;;runs while simultaneously implementing the variable rep strategy from sarah.
 ;;papers over the minutae of placing replicator function in the right place,
 ;;optional thread overloads, etc.
-#_
-(defn taa-runs [wbkpath input-map &
-                {:keys [project->reps rc-runs? threads] :as opts}]
+
+;;note: we can control levels of the design a couple of ways.  There's
+;;the naive :levels value in the project that gets read.  This is (currently)
+;;ignored by taa.capacity/do-taa-runs, since there's no bridge
+;;with the project map.  Levels (optionally) provide a quick limit
+;;on the number designs we run by limiting the spread to the number
+;;of levels and computing variable width steps in between supply
+;;changes.  This helps a bit in doing quick test runs, or intentionally
+;;sparse designs, but we don't historically leverage it directly
+;;in TAA or RUN-AMC.
+
+;;Instead, we leverage a function to emit designs, under
+;;marathon.analysis.random/*project->experiments* . This is a function ::
+;;project->low->high->[project+] By default, it will be bound to
+;;marathon.analysis.random/project->experiments, which won't vary the rc at all.
+;;For the taa pipeline, we end up going through
+;;marathon.analysis.random/rand-runs-ac-rc, which binds *project->experiments*
+;;to a partially applied marathon.analysis.random/project->experiments-ac-rc
+;;with rc supply bounds lifted from the project map.
+
+;;From an API perspective, we have a very powerful means to mess with
+;;design generation via marathon.analysis.random/*project->experiments*,
+;;since this is a deep hook into how a project is expanded into
+;;one or more designs (typically some supply variation, but we can do
+;;whatever including policy variation, demand, etc.).
+
+;;It would be nice to expose that hook as an option here.
+;;We'll stick with the legacy convention - for now - but a good
+;;API should be able to allow the user to hook all these things.
+(defn taa-runs [wkbk-path input-map &
+                {:keys [project->reps rc-runs? threads] :as opts
+                 :or {threads (marathon.analysis.util/guess-physical-cores)}}]
   (capacity/do-taa-runs
    wkbk-path
    (assoc (if rc-runs? (rc-run-prep input-map) input-map) ;;this is just supplementary junk IMO.
@@ -140,6 +169,7 @@
           ;;:reps num-reps
           :conj-proj {:replicator  project->reps}
           :seed       (rand Long/MAX_VALUE)
-          :identifier (str identifier "_" file-tag "_"
-                           i "-" computer-name)
           :threads threads)))
+
+;;might be nice to have a quick/debug version of above.
+;;also a dry-run or run-plan emitter.

@@ -281,6 +281,12 @@
                          ;;false for no, don't do ra*rc
                          false))
 
+;;use the new api to do a quick 1-rep run.
+;;currently dumps output to ./random-out.txt
+(defn quick-run []
+  (core/taa-runs  path-AP input-map-AP
+                  :project->reps (constantly  1)))
+
 
 ;;add taa post processing
 ;; - marathon performance data (bcd)
