@@ -7,10 +7,13 @@
                  [demandanalysis :as analysis]]
             [taapost [shave :as shave]
                      [bcd   :as bcd]
-                     [nlist :as nlist]]
+                     [nlist :as nlist]
+                     [util  :as u]]
             [marathon.analysis.random :as random]
             [demand_builder.forgeformatter :as ff]
-            [spork.util [io :as io]]))
+            [spork.util [io :as io]]
+            [tablecloth.api :as tc]
+            [oz.core :as oz]))
 
 ;;note - original script assumed in-ns taa.core, so we are
 ;;slightly complicating this but meh.
@@ -232,11 +235,198 @@
 (def demand-names ["AP" "BP"])
 (def path-AP (core/m4-path input-map-AP "AP"))
 (def path-BP (core/m4-path input-map-BP "BP"))
+;;parent directory of our inputs, useful for building
+;;relative paths later.  this "should" be equivalent
+;;to (input-map-AP :resources-root) by convention.
+(def root-path (io/parent-path path-AP))
 
-;;builds workbook.
+
+;;Workbook Prep
+;;=============
+
+;;Compiles discrete m4 workbooks with demand, policy, supply
+;;settings derived from the input-map and associated distinct input worksheets.
+;;This builds a single artifact that can be run through typical
+;;capacity analysis (it will include all SRCs by default though).
+;;This deterministic artifact will not have random initial conditions; those
+;;are determined later in the pipeline when we perform our design of experiment
+;;using supply variation, which other aspects of the input-map will parameterize.
+
+;;Note the useage of the *default-rc-ratio*.  This is an optional dynamic variable
+;;that we can bind at build-time to define a global default for rc availability
+;;assumptions (specifically how much of RC supply is absorbed by a proxy cannibalization
+;;demand during conflict).  The current api makes it easy to perform sensistivity
+;;analysis on this parameter by varying it and building different inputs that
+;;can be fed into the rest of the pipeline.  For now, we just assume 50% if
+;;no availability is specifically provided in the input data.
 (defn build-them []
   (binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-AP))
   (binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-BP)))
+
+;;Basic Supply Variation Runs
+;;===========================
+
+;;We can use the new API to do a (relatively) quick 1-rep run. We use
+;;the :project->reps option and supply a function of project->int which
+;;indicates how many reps to do for a single design point. This allows a lot of
+;;flexbility since we can use ANY function to determine variable reps based on
+;;an M4 project map that corresponds to a design point for a supply variation
+;;mixture.
+
+;;If we supply nothing explicitly, then the default is to assume the variable
+;;rep scheme defined in taa.core/project->variable-reps, which will perform
+;;fewer replications for higher supply counts and vice versa.
+
+;;If we want to use a static or fixed rep scheme (like do 30 reps for
+;;everything) then we can either provide a function that does this, like
+;;:project->reps (constantly k) where k is an integer, or we
+;;set our reps in the input-map under :reps, and turn off project->reps by
+;;setting it to nil via
+;;:project->reps nil
+;;on the invocation.
+
+;;currently dumps output to ./random-out.txt
+(defn quick-run []
+  (println "Running AP")
+  (core/taa-runs  path-AP input-map-AP
+                  :project->reps (constantly  1))
+  (println "Running BP")
+  (core/taa-runs  path-BP input-map-BP
+                  :project->reps (constantly  1)))
+
+;;Bar Chart Data (BCD)
+;;===================
+
+;;builds all BCD info for every results_{tag}.txt file, emits bcd_{cleanedtag}.txt
+;;based on the legacy script, this will do an implicit coercion of {tag} where
+;;tag = the scenario arg supplied, the resulting cleanedtag will be A, otherwise B.
+
+;;This is currently a weak hardcoding that we probably should work around, but
+;;it's consistent with the legacy script.
+
+;;e.g., in the below case,
+;;   results_AP.txt -> bcd_AP.txt, and in bcd_AP.txt, the :scenario field will be A
+;;   results_BP.txt -> bcd_BP.txt, and in bcd_BP.txt, the :scenario field will be B
+
+;;We do NOT currently cover arbitrary numbers of scenarios for naming, only <= 2.
+;;One common use case is to separate multiple experiments (e.g. for sensitivity analysis)
+;;into separate folders (e.g., with <= 2 scenarios each).  do-bcds and cat-bcds will
+;;crawl from a root folder and compute all the path-relative bcd files as above,
+;;with an added field showing the pathname.  Then cat-bcds will do the same - build
+;;a concatenated bcd_all.txt from any child file with bcd_ in its prefix.  The final
+;;bcd_all.txt will retain the pathname so it's possible to do aggregate analysis or
+;;filtering.  One use case would be a root folder containing multiple children, where
+;;each child corresponds to a workbook built with a different default-rc-ratio value.
+;;Each child then (after performing supply variation runs) with multiple results.
+;;The bcd functions will (if supplied with the parent directory), pick up all the children
+;;and compute bcd's, and then the cat-bcds will (if supplied with the same parent)
+;;concat them all into a file at the root folder.  The caller can trivially alter this
+;;by pointing at a different folder structure.  This setup makes it easy to programatically
+;;perform bulk experiments and sensitivity analyses, and then collect canonical results
+;;for comparison.
+
+;;See taapost.bcd/do-bcds for more information on the implementation.
+(defn bcds []
+  (bcd/do-bcds root-path "AP")
+  ;Now that we have bcds, we'd like to concat them (this is the format FM expects),
+  ;so we have a simple function that does that:
+  (bcd/cat-bcds (io/parent-path path-AP)))
+
+;;emission example.
+
+;;Shave Charts
+;;============
+
+;;We now emit shave charts for each scenario.
+;;The new shavechart pipeline actually provides the ability
+;;to emit based purely on results and a unit_detail workbook,
+;;or based on the legacy barchart data (bcd.txt) and a
+;;unit_detail workbook.
+
+;;We expect unit_detail to provide a table of [:SRC :TITLE :STR :BRANCH] fields,
+;;and it's pretty permissive in how we get that.  Typically, we'll use
+;;taapost.shave/read-unit-detail which leverages tableloth, and we point it
+;;at a workbook where the first spreadsheet (typically a singleton sheet)
+;;has those feeds in normal, contiguous table form.
+
+;;We often have this information already provided from earlier inputs
+;;from forge, hence the loose reference to unit_detail.  However, you can
+;;use any worksheet that has this information in it, as long as we get
+;;an association between SRC TITLE STR BRANCH, we're okay.
+;;We might append that information to the base SupplyDemand worksheet and
+;;just use that, or we can pull it in from another source.
+;;Here we'll use the SRC baseline that we typically have on hand,
+;;which should provide all the information out of the box.
+
+;;Since this is typically shared information we'll just keep it global for now.
+(def unit-detail (shave/read-unit-detail (io/file-path root-path "SRC_STR_BRANCH.xlsx")))
+
+;;Going this route, we only need the results file and a commensurate unit-detail
+;;table.  We can interactively render the ph3 branch shave charts pretty easily.
+;;Invoking the following fn will pop up a browser window and display all the
+;;vega plots for shave charts for each branch.  This is useful for interactive
+;;testing and analysis.  As you will see, there are corresponding simplified paths
+;;for just emitting the plots (you can also print them as a pdf from the browser window
+;;semi-manually, but headless rendering is more desirable for generating results since
+;;it requires no visual rendering or web browser).
+(defn render-branch-test []
+  (let [dt (tc/dataset (io/file-path root-path "results_AP.txt")
+                {:key-fn keyword :separator \tab})
+        ph3 (shave/phase-data dt unit-detail "phase3")]
+    (oz/view! (->  ph3 shave/branch-charts))))
+
+;;Note: we can get the same information from bcd.txt output as an alternative.
+;;Both lead to the same end-state, but this variant supports rendering legacy
+;;results if we need to (as per last year).
+(def bcd  (tc/dataset (io/file-path root-path "bcd_AP.txt") {:separator "\t" :key-fn keyword}))
+(def bcd2 (-> bcd (shave/barchart->src-charts unit-detail)))
+
+;;You can interactively view subsets of the data using tablecloth to filter down
+;;the bcd dataset or otherwise transform it prior to supplying to various shave chart operations.
+;;As before, if you evaluate these commands they will provide interactive views of branch
+;;charts for conflict and competition in the web browser.
+
+;;If we want just emit all the typical shave charts, we can do so:
+(defn emit-all-shave-charts [& {:keys [bcd-data] :or {bcd-data bcd2}}]
+  (let [chartroot    (io/file-path root-path "charts")
+        competition  (io/file-path chartroot "/branch/competition")
+        conflict     (io/file-path chartroot "/branch/conflict")
+        agg          (io/file-path chartroot "branch-agg")]
+    (-> bcd-data
+        (tc/select-rows (fn [{:keys [phase]}] (= phase "comp1")))
+        (shave/emit-branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
+                                   :subtitle "Campaigning"
+                                   :root competition}))
+    (-> bcd-data
+        (tc/select-rows (fn [{:keys [phase]}] (= phase "phase3")))
+        (shave/emit-branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
+                                   :subtitle "Conflict-Phase 3 Most Stressful Scenario"
+                                   :root conflict}))
+    (-> bcd-data
+        (tc/select-rows (fn [{:keys [phase]}] (= phase "phase3")))
+        (shave/emit-agg-branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
+                                       :subtitle "Conflict-Phase 3 Most Stressful Scenario"
+                                       :root agg}))))
+
+#_
+(oz/view! (-> bcd2
+              (tc/select-rows (fn [{:keys [phase]}] (= phase "phase3")))
+              (shave/branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
+                              :subtitle "Conflict-Phase 3 Most Stressful Scenario"})))
+
+#_
+(oz/view! (-> bcd2
+              (tc/select-rows (fn [{:keys [phase]}] (= phase "comp1")))
+              (shave/branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
+                              :subtitle "Campaigning"})))
+
+#_
+(oz/view! (-> bcd2
+              (shave/agg-branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
+                                  :subtitle "Most Stressful Scenario By Branch"})))
+
+;;N-List
+;;======
 
 ;;does a single rep of capacity analysis
 #_#_
@@ -280,19 +470,6 @@
                          24
                          ;;false for no, don't do ra*rc
                          false))
-
-;;use the new api to do a quick 1-rep run.
-;;currently dumps output to ./random-out.txt
-(defn quick-run []
-  (core/taa-runs  path-AP input-map-AP
-                  :project->reps (constantly  1)))
-
-
-;;add taa post processing
-;; - marathon performance data (bcd)
-;; - 1-n
-;; - shave charts
-;; - tsunami charts
 
 (comment
 ;;This code is used to spit out results for each day where
@@ -348,4 +525,7 @@
   (require '[portal.api :as p])
   (def p (p/open {:app false})) ;;use the system browser
   (add-tap #'p/submit)
+  ;;we can use tap> or p/submit to look at values in portal.
+  (tap> input-map-AP)
+  #_(p/submit input-map-AP)
   )

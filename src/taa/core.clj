@@ -159,9 +159,16 @@
 ;;It would be nice to expose that hook as an option here.
 ;;We'll stick with the legacy convention - for now - but a good
 ;;API should be able to allow the user to hook all these things.
+;;We default to variable rep runs (using our heuristic defined in
+;;taa.core/rep-count).  If a caller wants to have FIXED reps, they
+;;have to opt-in by either changing :project->reps to (constantly k)
+;;where k is an integer rep count, or have an integer :reps entry in the input-map
+;;and supply (taa-runs ... :project->reps nil ...) for the taa-runs invocation
+;;which will fall back to the rep count setup in the input map.
 (defn taa-runs [wkbk-path input-map &
                 {:keys [project->reps rc-runs? threads] :as opts
-                 :or {threads (marathon.analysis.util/guess-physical-cores)}}]
+                 :or {threads (marathon.analysis.util/guess-physical-cores)
+                      project->reps project->variable-reps}}]
   (capacity/do-taa-runs
    wkbk-path
    (assoc (if rc-runs? (rc-run-prep input-map) input-map) ;;this is just supplementary junk IMO.
