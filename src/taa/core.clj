@@ -180,3 +180,26 @@
 
 ;;might be nice to have a quick/debug version of above.
 ;;also a dry-run or run-plan emitter.
+
+;;we'd like to estimate run volume and provide some high-level means for
+;;partitioning work by volume.
+;;We can "typically" correlate the amount of supply in a run with it's total
+;;effort.  Then multiply by reps and we get run volume for an SRC.
+
+;;we use taa.capacity/taa-dry-run to get a seq of maps that provides our
+;;designs + rep counts per design.  Since this is all downstream of the
+;;normal API, we should be able to get the same results given the same
+;;inputs.
+#_
+(defn taa-run-plan [wkbk-path input-map &
+                    {:keys [project->reps rc-runs? threads] :as opts
+                     :or {threads (marathon.analysis.util/guess-physical-cores)
+                          project->reps project->variable-reps}}]
+  (capacity/do-taa-runs
+   wkbk-path
+   (assoc (if rc-runs? (rc-run-prep input-map) input-map) ;;this is just supplementary junk IMO.
+          ;;not used with :replicator
+          ;;:reps num-reps
+          :conj-proj {:replicator  project->reps}
+          :seed       (rand Long/MAX_VALUE)
+          :threads threads)))

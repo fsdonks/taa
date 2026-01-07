@@ -13,7 +13,8 @@
             [demand_builder.forgeformatter :as ff]
             [spork.util [io :as io]]
             [tablecloth.api :as tc]
-            [oz.core :as oz]))
+            [oz.core :as oz]
+            [spork.util.excel.core :as xl]))
 
 ;;note - original script assumed in-ns taa.core, so we are
 ;;slightly complicating this but meh.
@@ -332,8 +333,6 @@
   ;so we have a simple function that does that:
   (bcd/cat-bcds (io/parent-path path-AP)))
 
-;;emission example.
-
 ;;Shave Charts
 ;;============
 
@@ -427,6 +426,27 @@
 
 ;;N-List
 ;;======
+;;These are the weightings we use for nominal phases.
+;;They're variable on purpose.
+(def phase-weights
+  {"comp1" 0.1
+   "phase1" 0.1
+   "phase2" 0.1
+   "phase3" 0.25
+   "phase4" 0.1
+   "comp2" 0.1})
+
+(defn spit-nlist []
+  (let [results-map {"A" (io/file-path root-path "results.txt")
+                     "B" "~/repos/make-one-to-n/resources/results.txt"}
+        m4-books    {"A" "A.xlsx"
+                     "B" "B.xlsx"}
+        unit-detail-path (io/file-path root-path "SRC_STR_BRANCH.xlsx")
+        res        (nlist/make-one-n results-map m4-books "."
+                                     phase-weights "one_n"
+                                     unit-detail-path {})]
+    (->> (-> res simple-names  (tc/rename-columns (fn [k] (name k))))
+         (xl/table->xlsx "res.xlsx" "results"))))
 
 ;;does a single rep of capacity analysis
 #_#_

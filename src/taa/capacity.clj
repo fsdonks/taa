@@ -765,6 +765,47 @@
              (spit-results results-path)
              (process-results risk-path input-map))))))
 
+(defn taa-dry-run
+  [in-path {:keys [identifier resources-root phases compo-lengths reps lower
+                   lower-rc upper upper-rc threads include-no-demand seed
+                   transform-proj min-distance conj-proj run-site]
+            :or {seed random/+default-seed+ lower-rc 1 upper-rc 1
+                 min-distance 0} :as input-map}]
+  (let [proj (a/load-project in-path)
+        proj (merge proj conj-proj)
+        original-replicator (proj :replicator)
+        variable-reps? (clojure.string/includes? (str original-replicator)
+                          "taa.core$project__GT_variable_reps")
+        proj (-> (if transform-proj
+                   (a/update-proj-tables transform-proj proj)
+                   proj)
+                  ;;we require rc cannibalization modification for taa
+                  ;;but maybe this isn't standard for ac-rc random
+                  ;;runs yet
+                  (random/add-transform random/adjust-cannibals [])
+                  ;;we basically turn off replication.
+                  (assoc :original-replicator original-replicator
+                         :replicator (fn [proj] [proj])))]
+    (binding [random/*exec-experiments* identity]
+      (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
+                                   proj :reps reps :phases phases
+                                   :lower lower
+                                   :upper upper :compo-lengths
+                                   compo-lengths
+                                   :seed seed)
+           (map (fn [{:keys [src tables reps original-replicator] :as prj}]
+                  (let [supply (->> tables
+                                    :SupplyRecords
+                                    marathon.analysis.experiment/grouped-supply)]
+                    {:root-project in-path
+                     :src src
+                     :supply supply
+                     :reps (cond variable-reps?
+                                 (marathon.analysis.random/rep-count (->> supply vals (reduce +)))
+                                 original-replicator
+                                 (count (original-replicator prj))
+                                 :else reps)})))))))
+
 ;;Best way to structure taa inputs?
 ;;might use the same timeline, so keep the path specified to that and
 ;;the supply demand (so that we don't have to rename supplydemand)
