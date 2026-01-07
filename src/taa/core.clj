@@ -183,6 +183,7 @@
 
 ;;we'd like to estimate run volume and provide some high-level means for
 ;;partitioning work by volume.
+
 ;;We can "typically" correlate the amount of supply in a run with it's total
 ;;effort.  Then multiply by reps and we get run volume for an SRC.
 
@@ -190,12 +191,12 @@
 ;;designs + rep counts per design.  Since this is all downstream of the
 ;;normal API, we should be able to get the same results given the same
 ;;inputs.
-#_
+
 (defn taa-run-plan [wkbk-path input-map &
                     {:keys [project->reps rc-runs? threads] :as opts
                      :or {threads (marathon.analysis.util/guess-physical-cores)
                           project->reps project->variable-reps}}]
-  (capacity/do-taa-runs
+  (capacity/taa-dry-run
    wkbk-path
    (assoc (if rc-runs? (rc-run-prep input-map) input-map) ;;this is just supplementary junk IMO.
           ;;not used with :replicator
@@ -203,3 +204,19 @@
           :conj-proj {:replicator  project->reps}
           :seed       (rand Long/MAX_VALUE)
           :threads threads)))
+
+;;we'd like to split our runs into equal partitions so each
+;;node gets the same batch of work.  since we know
+;;apriori, we can do this.  Then for system like e.g., PBS,
+;;it's pretty trivial to load a run plan and index into a specific
+;;batch or pre-cooked file with the experiments to run + reps.
+;;e.g. if we have 500 volume and 55 nodes, we can distribute
+;;that in batches of 9 pretty evenly.
+;;I think we can just make the part-size (inc (quot volume node-count)).
+;;We could also just try to pack naively....could also sort by volume,
+;;then just round-robin distribute the work.
+(defn partitioned-run-plan [node-count xs]
+  (->> xs
+       (sort-by (comp - :volume))
+       (map (fn [nd wrk] (assoc wrk :node nd))
+            (cycle (vec (range node-count))))))

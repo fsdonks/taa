@@ -785,8 +785,8 @@
                   (random/add-transform random/adjust-cannibals [])
                   ;;we basically turn off replication.
                   (assoc :original-replicator original-replicator
-                         :replicator (fn [proj] [proj])))]
-    (binding [random/*exec-experiments* identity]
+                         :replicator (fn [proj] 1)))]
+    (binding [random/*exec-experiments* (fn [p]  [p])]
       (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
                                    proj :reps reps :phases phases
                                    :lower lower
@@ -796,15 +796,18 @@
            (map (fn [{:keys [src tables reps original-replicator] :as prj}]
                   (let [supply (->> tables
                                     :SupplyRecords
-                                    marathon.analysis.experiment/grouped-supply)]
+                                    marathon.analysis.experiment/grouped-supply
+                                    (reduce-kv (fn [acc compo rec]
+                                                 (assoc acc compo (:Quantity rec)))
+                                               {}))
+                        effective-reps (cond original-replicator
+                                            (original-replicator prj)
+                                            :else reps)]
                     {:root-project in-path
                      :src src
                      :supply supply
-                     :reps (cond variable-reps?
-                                 (marathon.analysis.random/rep-count (->> supply vals (reduce +)))
-                                 original-replicator
-                                 (count (original-replicator prj))
-                                 :else reps)})))))))
+                     :reps effective-reps
+                     :volume (* effective-reps (->> supply vals (reduce +)))})))))))
 
 ;;Best way to structure taa inputs?
 ;;might use the same timeline, so keep the path specified to that and

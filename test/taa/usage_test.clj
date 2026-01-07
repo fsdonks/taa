@@ -445,7 +445,7 @@
         res        (nlist/make-one-n results-map m4-books "."
                                      phase-weights "one_n"
                                      unit-detail-path {})]
-    (->> (-> res simple-names  (tc/rename-columns (fn [k] (name k))))
+    (->> (-> res nlist/simple-names  (tc/rename-columns (fn [k] (name k))))
          (xl/table->xlsx "res.xlsx" "results"))))
 
 ;;does a single rep of capacity analysis
