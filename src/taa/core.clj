@@ -220,3 +220,141 @@
        (sort-by (comp - :volume))
        (map (fn [nd wrk] (assoc wrk :node nd))
             (cycle (vec (range node-count))))))
+
+(require '[spork.opt.dumbanneal :as ann])
+
+;;one representation is a 2d array of bin x item.
+;;sparse is probably better but meh.
+;;we want all bins to have similar workloads.
+;;so we mix stuff around until we get pretty close to parity.
+#_
+{:deviation    "total deviation between bins, e.g | bin1V - bin2V - bin3V|"
+ :volumes   [] ;;total volume of each bin
+ :jobs      [] ;;assignment of rep->bin.
+ :total-volume  1}
+
+(defn ->var [init] (atom init))
+(defn ->vars [inits] (->> inits (mapv atom)))
+(defn ->sum [xs]
+  (let [res (atom (->> xs (map deref) (map (fn [x] (or x 0))) (reduce +)))
+        _ (doseq [x xs]
+            (add-watch x (gensym "sum")
+                       (fn [_ _ vold vnew]
+                         (when-not (== vold vnew)
+                           (let [delta (- vnew vold)]
+                             (swap! res + delta))))))]
+    res))
+
+(defn ->avg [xs]
+  (let [n     (count xs)
+        total (->sum xs)
+        res   (atom (/ @total n))
+        _ (add-watch total (gensym "avg")
+                     (fn [_ _ vold vnew]
+                       (when-not (== vold vnew)
+                         (reset! res (/ vnew n)))))]
+    res))
+
+(defn ->fn1 [f x]
+  (let [atom? (instance? clojure.lang.IDeref x)
+        x (if atom?
+            x
+            (atom x))
+        res (atom (f @x))
+        _   (when atom?
+              (add-watch x (gensym "fn1") (fn [_ _ vold vnew]
+                                            (when (not= vold vnew)
+                                              (reset! res (f vnew))))))]
+    res))
+
+(defn ->fn [f xs]
+  (if-not (coll? xs)
+    (->fn1 f xs)
+  (let [dirty (atom false)
+        ^java.util.ArrayList
+        cache (java.util.ArrayList. (for [x xs] (if (instance? clojure.lang.IDeref x) @x x)))
+        init-val (apply f cache)
+        current (atom init-val)
+        eval! (fn []
+                (if @dirty
+                  (do (println cache)
+                      (reset! dirty nil)
+                      (reset! current (apply f cache)))
+                  @current))
+        _ (doseq [[idx atm] (map-indexed vector xs)]
+            (when (instance? clojure.lang.IDeref atm)
+              (add-watch atm (gensym "fn-arg")
+                         (fn [_ _ vold vnew]
+                           (when-not (= vold vnew)
+                             (.set cache idx vnew)
+                             (reset! dirty true)
+                             )))))]
+    (reify clojure.lang.IRef
+;	    void setValidator(IFn vf)
+;      IFn getValidator()
+;      IPersistentMap getWatches()
+      (addWatch [this k f]
+        (add-watch current k f))
+      (removeWatch  [this k]
+        (remove-watch current k))
+      (deref [this] (eval!))))))
+
+(defn ->map1 [f xs]
+  (mapv (fn [atm] (->fn f atm)) xs))
+
+;;try to pack our reps into equivalent batches.
+(defn apack [node-count batches]
+  (let [batches (vec batches)
+        jobs (->> batches
+                  (map-indexed (fn [idx m] (assoc m :batch idx)))
+                  (mapcat (fn [{:keys [batch src reps volume] :as m}]
+                            (repeat reps {:batch batch
+                                          :size (/ volume reps)})))
+                  (map-indexed (fn [idx m] (assoc m :job idx)))
+                  vec)
+        total-volume (->> batches (map :volume) (reduce +))
+        ;;ideal bin size.
+        theoretical  (/ total-volume (double node-count))
+        ^longs
+        job->size   (->> jobs (mapv :size) long-array)
+        job-count   (count jobs)
+        <totals>    (->vars (repeat  node-count 0))
+        <devs>      (->map1 (fn [tot] (Math/abs (- tot theoretical))) <totals>)
+        <avg-dev>   (->avg <devs>)
+        push-bin!  (fn push-bin! [{:keys [bins totals]} ^long bidx ^long job]
+                    (doto ^java.util.HashSet (bins bidx)  (.add job))
+                    (swap!  (<totals> bidx) + (aget job->size job)))
+        pop-bin!  (fn pop-bin! [{:keys [bins totals]} ^long bidx ^long job]
+                    (doto ^java.util.HashSet (bins bidx)
+                      (.remove job))
+                    (swap!  (<totals> bidx) - (aget job->size job)))
+        state (let [inits (vec (repeatedly node-count #(java.util.HashSet.)))
+                    init-state {:job-count job-count
+                                :theoretical theoretical
+                                :bins      inits
+                                :totals   <totals>
+                                :devs     <devs>
+                                :avg-dev  <avg-dev>}]
+                     (doseq [[bin job] (map vector
+                                            (cycle (range node-count))
+                                            (range job-count))]
+                       (push-bin! init-state bin job))
+                     init-state)
+        un-jobs (fn [{:keys [bins]}]
+                  (->> bins
+                       (mapv (fn [xs]
+                               (->> xs
+                                    (map jobs)
+                                    (group-by :batch)
+                                    (reduce-kv (fn blah [acc batch xs]
+                                                 (let [{:keys [size] :as r} (first xs)
+                                                       n (count xs)]
+                                                   (conj acc (-> (dissoc r :batch :job)
+                                                                 (merge (batches batch))
+                                                                 (assoc :reps n
+                                                                        :volume (* size n))))))
+                                               []))))))]
+    (if (-> state :avg-dev deref zero?)
+      (un-jobs state)
+      ;;let's try!
+    state)))
