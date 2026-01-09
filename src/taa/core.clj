@@ -5,6 +5,7 @@
              [requirements :as requirements]
              [demandanalysis :as analysis]]
             [spork.util [io :as io]]
+            [spork.opt [dumbanneal :as da] [annealing :as ann]]
             [marathon.analysis.random :as random])
   (:import [java.net InetAddress]))
 
@@ -221,8 +222,6 @@
        (map (fn [nd wrk] (assoc wrk :node nd))
             (cycle (vec (range node-count))))))
 
-(require '[spork.opt.dumbanneal :as ann])
-
 ;;one representation is a 2d array of bin x item.
 ;;sparse is probably better but meh.
 ;;we want all bins to have similar workloads.
@@ -303,58 +302,92 @@
   (mapv (fn [atm] (->fn f atm)) xs))
 
 ;;try to pack our reps into equivalent batches.
-(defn apack [node-count batches]
-  (let [batches (vec batches)
-        jobs (->> batches
-                  (map-indexed (fn [idx m] (assoc m :batch idx)))
-                  (mapcat (fn [{:keys [batch src reps volume] :as m}]
-                            (repeat reps {:batch batch
-                                          :size (/ volume reps)})))
-                  (map-indexed (fn [idx m] (assoc m :job idx)))
-                  vec)
-        total-volume (->> batches (map :volume) (reduce +))
-        ;;ideal bin size.
-        theoretical  (/ total-volume (double node-count))
-        ^longs
-        job->size   (->> jobs (mapv :size) long-array)
-        job-count   (count jobs)
-        <totals>    (->vars (repeat  node-count 0))
-        <devs>      (->map1 (fn [tot] (Math/abs (- tot theoretical))) <totals>)
-        <avg-dev>   (->avg <devs>)
-        push-bin!  (fn push-bin! [{:keys [bins totals]} ^long bidx ^long job]
-                    (doto ^java.util.HashSet (bins bidx)  (.add job))
-                    (swap!  (<totals> bidx) + (aget job->size job)))
-        pop-bin!  (fn pop-bin! [{:keys [bins totals]} ^long bidx ^long job]
-                    (doto ^java.util.HashSet (bins bidx)
-                      (.remove job))
-                    (swap!  (<totals> bidx) - (aget job->size job)))
-        state (let [inits (vec (repeatedly node-count #(java.util.HashSet.)))
-                    init-state {:job-count job-count
-                                :theoretical theoretical
-                                :bins      inits
-                                :totals   <totals>
-                                :devs     <devs>
-                                :avg-dev  <avg-dev>}]
-                     (doseq [[bin job] (map vector
-                                            (cycle (range node-count))
-                                            (range job-count))]
-                       (push-bin! init-state bin job))
-                     init-state)
-        un-jobs (fn [{:keys [bins]}]
-                  (->> bins
-                       (mapv (fn [xs]
-                               (->> xs
-                                    (map jobs)
-                                    (group-by :batch)
-                                    (reduce-kv (fn blah [acc batch xs]
-                                                 (let [{:keys [size] :as r} (first xs)
-                                                       n (count xs)]
-                                                   (conj acc (-> (dissoc r :batch :job)
-                                                                 (merge (batches batch))
-                                                                 (assoc :reps n
-                                                                        :volume (* size n))))))
-                                               []))))))]
-    (if (-> state :avg-dev deref zero?)
-      (un-jobs state)
-      ;;let's try!
-    state)))
+(defn apack
+  ([node-count batches] (apack node-count batches {}))
+  ([node-count batches anneal-opts]
+   (let [batches (vec batches)
+         jobs (->> batches
+                   (map-indexed (fn [idx m] (assoc m :batch idx)))
+                   (mapcat (fn [{:keys [batch src reps volume] :as m}]
+                             (repeat reps {:batch batch
+                                           :size (/ volume reps)})))
+                   (map-indexed (fn [idx m] (assoc m :job idx)))
+                   vec)
+         total-volume (->> batches (map :volume) (reduce +))
+         ;;ideal bin size.
+         theoretical  (/ total-volume (double node-count))
+         ^longs
+         job->size   (->> jobs (mapv :size) long-array)
+         job-count   (count jobs)
+         <totals>    (->vars (repeat  node-count 0))
+         <devs>      (->map1 (fn [tot] (Math/abs (- tot theoretical))) <totals>)
+         <avg-dev>   (->avg <devs>)
+         ^longs
+         job->bin   (long-array (repeat job-count -1))
+         push-bin!  (fn push-bin! [{:keys [bins totals]} ^long bidx ^long job]
+                      (doto ^java.util.HashSet (bins bidx)  (.add job))
+                      (aset job->bin job bidx)
+                      (swap!  (<totals> bidx) + (aget job->size job)))
+         pop-bin!  (fn pop-bin! [{:keys [bins totals]} ^long bidx ^long job]
+                     (doto ^java.util.HashSet (bins bidx)
+                       (.remove job))
+                     (aset job->bin job -1)
+                     (swap!  (<totals> bidx) - (aget job->size job)))
+         state (let [inits (vec (repeatedly node-count #(java.util.HashSet.)))
+                     init-state {:job-count job-count
+                                 :bin-count node-count
+                                 :theoretical theoretical
+                                 :bins      inits
+                                 :job->bin job->bin
+                                 :totals   <totals>
+                                 :devs     <devs>
+                                 :avg-dev  <avg-dev>}]
+                 (doseq [[bin job] (map vector
+                                        (cycle (range node-count))
+                                        (range job-count))]
+                   (push-bin! init-state bin job))
+                 init-state)
+         root-project (->> batches first :root-project)
+         un-jobs (fn [{:keys [bins]}]
+                   (->> bins
+                        (mapv (fn [xs]
+                                (->> xs
+                                     (map jobs)
+                                     (group-by :batch)
+                                     (reduce-kv (fn blah [acc batch xs]
+                                                  (let [{:keys [size] :as r} (first xs)
+                                                        n (count xs)]
+                                                    (conj acc (-> (dissoc r :batch :job :size)
+                                                                  (merge (batches batch))
+                                                                  (assoc :reps n
+                                                                         :volume (* size n))
+                                                                  (dissoc :root-project)))))
+                                                []))))
+                        (hash-map :root-project root-project :batches)))]
+     (if (-> state :avg-dev deref zero?)
+       (un-jobs state)
+       ;;let's try!
+       (let [base-opts {:init-cost @<avg-dev>
+                        :step-function (fn step [_ {:keys [bins job->bin] :as sol}]
+                                         (let [job  (rand-int job-count)
+                                               from (aget job->bin ^long job)
+                                               to   (rand-int node-count)]
+                                           (pop-bin! sol from job)
+                                           (push-bin! sol to job)
+                                           (assoc sol :current-cost @<avg-dev>)))
+                        :step-back (fn unstep [sol]
+                                     (if-let [[bin1 bin2 job] (sol :prior)]
+                                       (do (pop-bin! sol bin2 job)
+                                           (push-bin! sol bin1 job)
+                                           (assoc sol :current-cost @<avg-dev>))
+                                       sol))
+                        :copy-solution (fn [{:keys [bins] :as sol}]
+                                         (assoc sol :bins (vec (for [^java.util.HashSet b bins]
+                                                                 (.clone b)))))}
+             opts (merge  anneal-opts base-opts)]
+       (->> (apply da/simple-anneal
+                   (fn [sol] @<avg-dev>)
+                   (assoc state :current-cost @<avg-dev>)
+                    [opts])
+            :best-solution
+            un-jobs))))))
