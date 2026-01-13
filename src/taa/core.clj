@@ -240,9 +240,30 @@
           (assoc idx (nth v tail))
           pop))))
 
+;;uses simulated annealing to find an approximately optimal solution to
+;;the multi machine|processor scheduling problem.
+;;our goal is to minimize the makespan (total time required to produce then
+;;complete result for all jobs).  We do so by simply minimizing the maximum
+;;workload for any one node.  Our neigborhood function explores via random
+;;swaps between the node with the current max load, and the node with the
+;;current minimum load, following a simulated annealing framework.
+;;This gets us pretty close to optimal if possible, with decently
+;;packed workloads across nodes.  If it's possible, we can find exact
+;;solutions immediately with simple round-robin workloads too.
 
-(defn apack
-  ([node-count batches] (apack node-count batches {}))
+;;The resulting plan is a map of
+;;{:root-project path-string|taa-project-map
+;; :batches [[{:src "44601P010", :supply {"AC" 0, "RC" 1}, :reps 9, :volume 9} .....] ...]}
+;;The idea being that we can load a plan and run a batch fairly simply.
+;;We need to specify where to emit results though.
+;;If these are all being done on their own node, then we use the normal
+;;:threads argument to modify our resource usage.
+;;Naively we then just load the project and execute one or more batches, where
+;;executing a batch implies doing the src and supply variation experiments
+;;defined in the batch definition.  We should be able to use the :identifier
+;;key in the input map to dump our batch results partition.
+(defn optimized-run-plan
+  ([node-count batches] (optimized-run-plan node-count batches {}))
   ([node-count batches anneal-opts]
    (let [batches (vec batches)
          jobs (->> batches
@@ -328,15 +349,42 @@
             (merge  {:job->size job->size})
             un-jobs))))))
 
-;;testing run plan junk
+;;we can just save this as .edn for now.  fine with that.
+;;can change to nippy later if it makes sense.
+(defn save-optimized-run-plan [tgt plan]
+  (spit tgt (with-out-str (prn plan))))
 
+;;when we want to run from a pre-existing plan, we just load
+;;the plan from a path (using read-string for now),
+;;get the project and relevant batch, then execute the batch.
+;;executing a batch means we want to change project->experiments
+;;to only load a specific set of designs.
+;;So if we have a batch of designs in the form of
+;;{:src "55633K100", :supply {"AC" 0, "RC" 27}, :reps 2, :volume 54}
+;;{:src "55633K100", :supply {"AC" 1, "RC" 27}, :reps 2, :volume 54}
+
+
+;;e.g., we will invoke this from a script where our input map is defined.
+(defn run-from-plan [plan-path batch-index input-map]
+  (let [{:keys [root-project batches]}
+          (clojure.edn/read-string plan-path)
+        batch (batches batch-index)
+        batch-id  (str "batch_" batch-index)
+        _ (println [:emitting-batch batch-index
+                    :from plan-path
+                    :to (str batch-id "_results.txt")])]
+    (capacity/batch-taa-runs root-project batch (assoc input-map :identifier batch-id))))
+
+;;testing run plan junk
 (comment
   (def res (taa.core/taa-run-plan
             (io/file-path taa.usage-test/root-path "m4_book_AP.xlsx")
             taa.usage-test/input-map-AP ))
-
-  (->> (apack 11 res
-              {:equilibration 30   :t0 100000000 :tmin 0.0000000000001
-               :itermax 1000000000 :decay (ann/geometric-decay 0.95)})
-       :batches
-       (mapv (fn [xs] (->> xs (map :volume) (reduce +))))))
+  
+  (def opt-plan 
+    (->> (optimized-run-plan 11 res
+                             {:equilibration 30   :t0 100000000 :tmin 0.0000000000001
+                              :itermax 1000000000 :decay (ann/geometric-decay 0.95)})
+#_         :batches
+#_
+         (mapv (fn [xs] (->> xs (map :volume) (reduce +)))))))

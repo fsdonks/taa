@@ -765,6 +765,18 @@
              (spit-results results-path)
              (process-results risk-path input-map))))))
 
+
+;;Static Run Planning
+;;===================
+;;The following are derived from do-taa-runs and serve as a means
+;;to generate offline, static run-plans for work estimation or
+;;batch processing e.g., on non-interactive PBS in an HPC system.
+
+;;taa-dry-run provides a specification for the actual work items that
+;;will be generated to feed a supply variation analysis. We don't run
+;;any simulation here, so it's very fast to just generate the potential
+;;runs.  This serves as a specification for run plans, where the designs
+;;can be distributed across nodes however.
 (defn taa-dry-run
   [in-path {:keys [identifier resources-root phases compo-lengths reps lower
                    lower-rc upper upper-rc threads include-no-demand seed
@@ -808,6 +820,100 @@
                      :supply supply
                      :reps effective-reps
                      :volume (* effective-reps (->> supply vals (reduce +)))})))))))
+
+
+;;Batch Runs
+;;==========
+
+;;This infrastucture exists to plumb in api support for executing
+;;a run-plan.  This serves as a replacement for do-taa-runs, where
+;;batch-taa-runs accepts new args for an in-path and a batch.
+;;We assume the caller has already read/loaded a batch, and has
+;;the path to a common M4 project shared across batches, and
+;;that the original input-map used to generate the run-plan is
+;;also being supplied.
+
+;;batch is a vector of
+;;{:src "55633K100", :supply {"AC" 0, "RC" 27}, :reps 2, :volume 54}
+;;since the original project is split by SRC, we'll
+;;group the batches by SRC and use that to filter out SRCs that don't
+;;matter to us.
+;;We're just updating supply records based on the supply mix,
+;;and injecting our rep-scheme into the :reps key for
+;;the resulting project (and removing any replicator key)
+;;to get the prescribed number of reps in.
+(defn expand-batch [{:keys [src tables] :as proj} src->designs]
+  (when-let [designs (src->designs src)]
+    ;;generate a project for each one.
+    (for [{:keys [supply reps]} designs]
+      (let [old-supply (->> tables :SupplyRecords)
+            new-supply (->> old-supply
+                            tbl/table-records
+                            (map (fn [{:keys [Component] :as r}]
+                                   (assoc r :Quantity (get supply Component 0))))
+                            tbl/records->table)]
+        (-> proj
+            (dissoc :replicator)
+            (assoc :reps reps)
+            (assoc-in :tables :SupplyRecords new-supply))))))
+
+
+(defn batch-runs [proj batch & {:as optional-args}]
+  (let [src->designs
+        (->> (group-by :src batch)
+             (reduce-kv (fn [acc src xs]
+                          (assoc acc src
+                                 (sort-by (fn [{:keys [volume reps]}]
+                                            (double (- (/ volume reps)))))))))]
+  (binding [random/*project->experiments*
+            (fn [proj & rest]
+              (expand-batch proj src->designs))]
+    (apply random/rand-runs proj
+           (mapcat identity optional-args)))))
+
+;;we assume the caller provides the input map as part of the run script.
+;;note: we can't serialize input-maps 100% because Craig had legacy stuff
+;;in there with inline anonymous functions, which don't serialize across
+;;nodes.  They need to be loaded from source (not a problem here).
+;;for pragmatism, we copy/paste most of the params from the input-map
+;;here from do-taa-runs, although we'll basically be ignoring them in effect
+;;by following the run-plan defined in the batch.
+(defn batch-taa-runs
+  [in-path batch {:keys [identifier resources-root phases compo-lengths reps lower
+                         lower-rc upper upper-rc threads include-no-demand seed
+                         transform-proj min-distance conj-proj run-site]
+                  :or {seed random/+default-seed+ lower-rc 1 upper-rc 1
+                       min-distance 0} :as input-map}]
+  (let [proj (a/load-project in-path)
+        proj (merge proj conj-proj)
+        proj (-> (if transform-proj
+               (a/update-proj-tables transform-proj proj)
+               proj)
+                  ;;we require rc cannibalization modification for taa
+                  ;;but maybe this isn't standard for ac-rc random
+                  ;;runs yet
+                  (random/add-transform random/adjust-cannibals []))
+        ;;proj (ensure-truthy-bools proj) ;;clustering fix.
+        out-name     (io/file-path resources-root (str "results_" identifier))
+        results-path (str out-name ".txt")
+        risk-path    (str out-name "_risk.xlsx")
+        ;;init random-out logging.
+        _ (println "Printing status to random-out.txt")]
+    (binding [random/*threads* threads]
+      (with-runsite run-site
+        (->> (batch-runs proj batch
+                         :reps   reps
+                         :phases phases
+                         :lower  lower
+                         :upper  upper
+                         :compo-lengths compo-lengths
+                         :seed seed)
+             (maybe-demand include-no-demand proj reps phases lower upper)
+             (spit-results results-path)
+             (process-results risk-path input-map))))))
+
+;;Input Builds
+;;============
 
 ;;Best way to structure taa inputs?
 ;;might use the same timeline, so keep the path specified to that and
