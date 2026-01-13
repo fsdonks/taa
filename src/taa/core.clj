@@ -262,8 +262,13 @@
 ;;executing a batch implies doing the src and supply variation experiments
 ;;defined in the batch definition.  We should be able to use the :identifier
 ;;key in the input map to dump our batch results partition.
+(def default-anneal-options
+  {:equilibration 30   :t0 100000000 :tmin 0.0000000000001
+   :itermax 1000000000 :decay (ann/geometric-decay 0.95)})
+
 (defn optimized-run-plan
-  ([node-count batches] (optimized-run-plan node-count batches {}))
+  ([node-count batches]
+   (optimized-run-plan node-count batches default-anneal-options))
   ([node-count batches anneal-opts]
    (let [batches (vec batches)
          jobs (->> batches
@@ -351,7 +356,7 @@
 
 ;;we can just save this as .edn for now.  fine with that.
 ;;can change to nippy later if it makes sense.
-(defn save-optimized-run-plan [tgt plan]
+(defn save-run-plan [tgt plan]
   (spit tgt (with-out-str (prn plan))))
 
 ;;when we want to run from a pre-existing plan, we just load
