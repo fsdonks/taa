@@ -16,8 +16,13 @@
             [oz.core :as oz]
             [spork.util.excel.core :as xl]))
 
-;;note - original script assumed in-ns taa.core, so we are
-;;slightly complicating this but meh.
+;;Here we define effectively a 1:1 port of the first half of our
+;;example from taa.usage-test (note useage_test and usage-test are
+;;synonymous for path loading purposes).
+
+;;The intent is to have one script that we can
+;;run to build our taa inputs and optionally derive a run-plan,
+;;or optionally execute an indexed batch from an existing run-plan.
 
 ;;This is the root path to our project.
 ;;tbd, change to resolve res.
