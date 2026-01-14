@@ -25,6 +25,11 @@
      (def returned-time elapsed#)
      ret#))
 
+;;m4-path says :
+;;lookup the path for the workbook relative to the input-map's resources-root
+;;with a baked name, like /{resources-root ... }/m4book_{demand-name}
+;;we should smarten this up and let the input-map define it and make
+;;demand-name optional.  
 (defn m4-path [input-map demand-name]
   (io/file-path (:resources-root input-map) (str "m4_book_" demand-name ".xlsx")))
 
@@ -358,6 +363,17 @@
 ;;can change to nippy later if it makes sense.
 (defn save-run-plan [tgt plan]
   (spit tgt (with-out-str (prn plan))))
+
+;;This will create a default optimized run-plan for
+;;the workbook at in-path
+(defn emit-plan [in-path input-map node-count
+                 & {:keys [out-path] :or {out-path "plan.edn"}
+                    :as taa-opts}]
+  (let [res (->> (apply taa-run-plan [in-path input-map taa-opts])
+                 (optimized-run-plan node-count))
+        _    (println [:spitting :run-plan :to out-path])
+        _    (save-run-plan out-path res)]
+    res))
 
 ;;when we want to run from a pre-existing plan, we just load
 ;;the plan from a path (using read-string for now),
