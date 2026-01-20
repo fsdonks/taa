@@ -43,7 +43,7 @@ JOBID=`echo ${PBS_JOBID} | cut -d'[' -f1`
 
 # Though not used here, OPTIONAL_INPUT could hold various inputs
 # that have different parameters set
-OPTIONAL_INPUT=$WORKDIR/input.${PBS_ARRAY_INDEX}
+# OPTIONAL_INPUT=$WORKDIR/input.${PBS_ARRAY_INDEX}
 
 # cd into directory that will contain all output
 ## from this PBS_ARRAY_INDEX run

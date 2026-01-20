@@ -696,11 +696,17 @@
 
    Note: was unable to do this with binding macro out of the box,
    since it assumes the m4peer.core/*run-site* macro exists already."
-  `(if (= ~site :cluster)
+  `(cond (= ~site :cluster)
      (binding [m4peer.core/*run-site* :cluster]
        (m4peer.core/with-cluster-logging :random-out
          ~@body))
-     (marathon.analysis.util/log-to "random-out.txt" ~@body)))
+     (= ~site :debug) ;;run locally and log to std-out.
+     (do (println [:debug-run :logging-to-out])
+         ~@body)
+     :else ;;otherwise (e.g. if nil)
+     (do ;;init random-out logging.
+         (println "Printing status to random-out.txt")
+         (marathon.analysis.util/log-to "random-out.txt" ~@body))))
 
 ;;Note on serialization and true/false:
 ;;=====================================
@@ -741,8 +747,8 @@
   (let [proj (a/load-project in-path)
         proj (merge proj conj-proj)
         proj (-> (if transform-proj
-               (a/update-proj-tables transform-proj proj)
-               proj)
+                   (a/update-proj-tables transform-proj proj)
+                   proj)
                   ;;we require rc cannibalization modification for taa
                   ;;but maybe this isn't standard for ac-rc random
                   ;;runs yet
@@ -750,9 +756,7 @@
         ;;proj (ensure-truthy-bools proj) ;;clustering fix.
         out-name (io/file-path resources-root (str "results_" identifier))
         results-path (str out-name ".txt")
-        risk-path    (str out-name "_risk.xlsx")
-        ;;init random-out logging.
-        _ (println "Printing status to random-out.txt")]
+        risk-path    (str out-name "_risk.xlsx")]
     (binding [random/*threads* threads]
       (with-runsite run-site
         (->> (random/rand-runs-ac-rc min-distance lower-rc upper-rc
@@ -855,7 +859,7 @@
         (-> proj
             (dissoc :replicator)
             (assoc :reps reps)
-            (assoc-in :tables :SupplyRecords new-supply))))))
+            (assoc-in [:tables :SupplyRecords] new-supply))))))
 
 
 (defn batch-runs [proj batch & {:as optional-args}]
@@ -863,8 +867,9 @@
         (->> (group-by :src batch)
              (reduce-kv (fn [acc src xs]
                           (assoc acc src
-                                 (sort-by (fn [{:keys [volume reps]}]
-                                            (double (- (/ volume reps)))))))))]
+                                 (vec (sort-by (fn [{:keys [volume reps]}]
+                                                 (double (- (/ volume reps)))) xs)))) {}))
+        _ (println src->designs)]
   (binding [random/*project->experiments*
             (fn [proj & rest]
               (expand-batch proj src->designs))]
@@ -896,9 +901,7 @@
         ;;proj (ensure-truthy-bools proj) ;;clustering fix.
         out-name     (io/file-path resources-root (str "results_" identifier))
         results-path (str out-name ".txt")
-        risk-path    (str out-name "_risk.xlsx")
-        ;;init random-out logging.
-        _ (println "Printing status to random-out.txt")]
+        risk-path    (str out-name "_risk.xlsx")]
     (binding [random/*threads* threads]
       (with-runsite run-site
         (->> (batch-runs proj batch

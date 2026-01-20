@@ -5,7 +5,8 @@
              [capacity :as capacity]
              [requirements :as requirements]
              [demandanalysis :as analysis]]
-            [spork.util [io :as io]]))
+            [spork.util [io :as io]]
+            [clojure.pprint :as pprint]))
 
 ;;Here we define effectively a 1:1 port of the first half of our
 ;;example from taa.usage-test (note useage_test and usage-test are
@@ -37,11 +38,16 @@
 ;; :threads
 ;; :include-no-demand ]
 
-
 ;;This is the root path to our project.
 ;;tbd, change to resolve res.
 (def inputs-outputs-path (io/file-path "./test/resources/usage"))
 (def src-str-branch  (io/file-path inputs-outputs-path "notional.xlsx"))
+
+(def forward-names-ac #{"Forward Stationing"})
+(def forward-names-rc #{"CampForwardRC"})
+(def forward-map {:ac forward-names-ac
+                  :rc forward-names-rc})
+(def forward-names (capacity/fwd-demands forward-map))
 
 ;;Phase definitions
 (def phases-AP
@@ -60,21 +66,6 @@
    ["phase4" 1436 2315]
    ["comp2"  2316 3649]])
 
-;;NOTE - we can define a helper to avoid having to recompute these.
-;;as well as allowing us to interpret inputs like a descending vector of threshold->weight...
-(defn assess-risk [x]
-  (cond (>= x 0.95) 0
-        (>= x 0.9) 1
-        (>= x 0.8) 2
-        (>= x 0.7) 3
-        (>= x 0)   4))
-
-(def weights
-  {"comp1" 0.25
-   "phase2" 0.125
-   "phase3" 0.5
-   "phase4" 0.125})
-
 (def curr-supply-demand "notional.xlsx")
 ;;if we have a pre-baked input, we don't need any of the workbook
 ;;build stuff.  we just want output stuff.
@@ -82,16 +73,13 @@
   {:resources-root inputs-outputs-path
    ;;an excursion name to prepend to output files
    :identifier "AP"
-   ;;the name of the timeline file that exists in the resource path
-   :timeline-name "timeline_A.xlsx"
-   :forge-files forge-AP
    ;;the name of the base marathon file that exists in the resources path.
    :base-m4-name "m4base.xlsx"
    ;;phases for results.txt
    :phases phases-AP
    ;;compo lengths for rand-runs
    :compo-lengths {"AC" 960 "RC" 2010 "NG" 2010}
-   ;;usually 30
+   ;;usually 30, although we'll have variable reps implicitly for the taa invocation.
    :reps 30
    ;;low bound on AC reductions, usually 0 (no AC inventory)
    :lower 0
@@ -123,9 +111,6 @@
 
 (def path-AP (core/m4-path input-map-AP "AP"))
 (def path-BP (core/m4-path input-map-BP "BP"))
-;;parent directory of our inputs, useful for building
-;;relative paths later.  this "should" be equivalent
-;;to (input-map-AP :resources-root) by convention.
 (def root-path (io/parent-path path-AP))
 
 ;;Workbook Prep
@@ -136,26 +121,33 @@
 
 ;;Batch Runs
 ;;==========
-(def node-count 10)
+(def default-node-count 10)
 ;;emit an optimized run-plan.
 (def plan-path "plan.edn")
 
+(def default-plans
+  {"AP" {:path path-AP :input-map input-map-AP :plan-path "planAP.edn"}
+   "BP" {:path path-BP :input-map input-map-BP :plan-path "planBP.edn"}})
+
 ;;This is a convenience function to emit our run-plan.
 ;;Feel free to copy or derive from it to point to other stuff.
-(defn prep-batches []
-  (taa.core/emit-plan
-   (io/file-path taa.usage-test/root-path "m4_book_AP.xlsx")
-   input-map-AP
-   node-count
-   :out-path plan-path))
+(defn prep-batches
+  ([] (prep-batches default-plans))
+  ([plans]
+   (pprint/pprint [:emitting-batches plans])
+   (doseq [[id {:keys [path input-map plan-path node-count]
+                :or {node-count default-node-count}}] plans]
+     (taa.core/emit-plan
+      path-AP
+      input-map-AP
+      node-count
+      :out-path plan-path))))
 
 ;;Node Execution
 ;;==============
 
 ;;After this point, we have "execution code"
 ;;We assume a plan exists, and we have an input map.
-(def ^:dynamic *plan-path* (io/file-path taa.usage-test/root-path "m4_book_AP.xlsx"))
-(def ^:dynamic *input-map* input-map-AP)
 
 ;;Ostensibly, both are defined above, or through some variation
 ;;in the script using the facilities listed.
@@ -166,8 +158,8 @@
 
 ;;execute the plan on a node.
 ;;this is, effectively, our CLI.
-(defn do-batch [plan-payth idx]
-  (core/run-from-plan *plan-path*  idx *input-map*))
+
+;;(taa.core/run-from-plan plan-path idx input-map)
 
 ;;The default scheme (if the inputs don't exist) would be to
 ;;generate our run plans on the host machine prior to job submission.
@@ -176,5 +168,39 @@
 ;; - one or more corresponding input-maps
 
 ;;So, we should be able to invoke this from bash pretty easily.
-;;e.g., (do (load-file "batch_test.clj")
-;;          (taa.batch-test/do-batch $INDEX))
+;;see batch_script.clj for an example, and batch.pbs for the calling script.
+
+;;Mocking
+;;=======
+
+;;for a simplified mock test, we can do the first item from each node
+;;to simulate batching across 3 nodes and make sure the plumbing is running.
+
+#_
+(->> default-plans
+     (reduce-kv (fn [acc k v] (assoc acc k (assoc v :node-count 3))) default-plans)
+     prep-batches)
+
+#_
+(doseq [plan-path (->> default-plans vals (map :plan-path))]
+  (let [{:keys [batches] :as plan} (taa.core/load-plan plan-path)
+        new-batches (->> batches
+                         (mapv (fn [xs]
+                                 (let [{:keys [reps volume] :as r} (first xs)]
+                                   [r #_(assoc r :reps 1
+                                           :volume  (/ volume reps))]))))
+        new-path  (str "small-" plan-path)]
+    (println [:emitting :tiny-plan new-path])
+    (spit new-path (assoc plan :batches new-batches) )))
+
+;;run our small plans...
+;;these will get dumped into results_batch_k.txt for each
+;;batch run.
+#_(doseq [i (range 3)]
+    (taa.core/run-from-plan "small-planAP.edn" i (assoc input-map-AP :run-site :debug)))
+
+;;it's an exercise for the reader to collate the batch results
+;;ex post facto.
+
+;;they are TSV files with identical fields, so it's simple enough
+;;to concat them from bash or through clojure pretty trivially.

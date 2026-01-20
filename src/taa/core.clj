@@ -371,7 +371,7 @@
                     :as taa-opts}]
   (let [res (->> (apply taa-run-plan [in-path input-map taa-opts])
                  (optimized-run-plan node-count))
-        _    (println [:spitting :run-plan :to out-path])
+        _    (println [:spitting :run-plan :to (.getAbsolutePath ^java.io.File (io/file "planBP.edn"))])
         _    (save-run-plan out-path res)]
     res))
 
@@ -384,15 +384,21 @@
 ;;{:src "55633K100", :supply {"AC" 0, "RC" 27}, :reps 2, :volume 54}
 ;;{:src "55633K100", :supply {"AC" 1, "RC" 27}, :reps 2, :volume 54}
 
+(defn load-plan [plan]
+  (cond (string? plan) (clojure.edn/read-string (slurp plan))
+        (map? plan) (do (assert (and (plan :root-project) (plan :batches)) "expected project and batches")
+                        plan)
+        :else (throw (ex-info "unknown batch plan type, expected path string or map!" {:in plan}))))
 
 ;;e.g., we will invoke this from a script where our input map is defined.
-(defn run-from-plan [plan-path batch-index input-map]
-  (let [{:keys [root-project batches]}
-          (clojure.edn/read-string plan-path)
+(defn run-from-plan [plan-or-path batch-index input-map]
+  (let [{:keys [root-project batches]} (load-plan plan-or-path)
         batch (batches batch-index)
         batch-id  (str "batch_" batch-index)
         _ (println [:emitting-batch batch-index
-                    :from plan-path
+                    :from (if (string? plan-or-path)
+                            plan-or-path
+                            :in-memory-map)
                     :to (str batch-id "_results.txt")])]
     (capacity/batch-taa-runs root-project batch (assoc input-map :identifier batch-id))))
 

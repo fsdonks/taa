@@ -437,10 +437,10 @@
    "comp2" 0.1})
 
 (defn spit-nlist []
-  (let [results-map {"A" (io/file-path root-path "results.txt")
-                     "B" "~/repos/make-one-to-n/resources/results.txt"}
-        m4-books    {"A" "A.xlsx"
-                     "B" "B.xlsx"}
+  (let [results-map {"A" (io/file-path root-path "results_AP.txt")
+                     "B" (io/file-path root-path "results_BP.txt")}
+        m4-books    {"A" (io/file-path root-path "m4_book_AP.xlsx")
+                     "B" (io/file-path root-path "m4_book_AP.xlsx")}
         unit-detail-path (io/file-path root-path "SRC_STR_BRANCH.xlsx")
         res        (nlist/make-one-n results-map m4-books "."
                                      phase-weights "one_n"
@@ -455,7 +455,7 @@
 
 ;;Do only the RA variation with fixed rc for the 1-n list.
 ;;We are now doing variable reps according to the ra+rc inventory.
-;;20 indicates the number of logical processors which shold match
+;;24 indicates the number of logical processors which shold match
 ;;what you have for you logical processors in task manager.
 #_#_
 (core/time-s (core/variable-rep-runs path-AP input-map-AP 1 (range 1) "ra" 24 false))
