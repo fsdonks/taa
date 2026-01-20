@@ -241,6 +241,15 @@
 ;;to (input-map-AP :resources-root) by convention.
 (def root-path (io/parent-path path-AP))
 
+;;we define case definitions as a map of {case {:keys [path input]}}
+;;where the case key is a string identifier that typically matches the
+;;identifier key in the input map, path is the path to the m4workbook
+;;built earlier, and input is the in-memory input-map for the case.
+(def default-cases
+  {"AP" {:path path-AP
+         :input input-map-AP}
+   "BP" {:path path-BP
+         :input input-map-BP}})
 
 ;;Workbook Prep
 ;;=============
@@ -260,9 +269,10 @@
 ;;analysis on this parameter by varying it and building different inputs that
 ;;can be fed into the rest of the pipeline.  For now, we just assume 50% if
 ;;no availability is specifically provided in the input data.
-(defn build-them []
-  (binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-AP))
-  (binding [capacity/*default-rc-ratio* 0.5] (capacity/preprocess-taa input-map-BP)))
+(defn build-case-inputs [case-map]
+  (doseq [input-map  (->> case-map vals (map :input))]
+    (binding [capacity/*default-rc-ratio* 0.5] ;;let's assume this is wired for now.
+      (capacity/preprocess-taa input-map))))
 
 ;;Basic Supply Variation Runs
 ;;===========================
@@ -286,14 +296,19 @@
 ;;:project->reps nil
 ;;on the invocation.
 
+;;little handle we can use to modify the pipeline.
+;;useful for testing e.g. quick-reps.
+(def ^:dynamic *rep-limit*)
+
 ;;currently dumps output to ./random-out.txt
-(defn quick-run []
-  (println "Running AP")
-  (core/taa-runs  path-AP input-map-AP
-                  :project->reps (constantly  1))
-  (println "Running BP")
-  (core/taa-runs  path-BP input-map-BP
-                  :project->reps (constantly  1)))
+(defn run-cases [case-map & {:keys [rep-limit]}]
+  (let [rep-limit (or rep-limit *rep-limit*)
+        project->reps (if rep-limit
+                        (constantly rep-limit)
+                        taa.core/project->variable-reps)]
+    (doseq [[case {:keys [path input]}] case-map]
+      (println (str "Running " case))
+      (core/taa-runs  path input :project->reps project->reps))))
 
 ;;Bar Chart Data (BCD)
 ;;===================
@@ -327,11 +342,20 @@
 ;;for comparison.
 
 ;;See taapost.bcd/do-bcds for more information on the implementation.
-(defn bcds []
-  (bcd/do-bcds root-path "AP")
-  ;Now that we have bcds, we'd like to concat them (this is the format FM expects),
-  ;so we have a simple function that does that:
-  (bcd/cat-bcds (io/parent-path path-AP)))
+;;we assume the first case in the case-map is the "base case", which
+;;will show generically as "A" in the barchartdata output file, with
+;;any other case being "B" (legacy assumption of only 2 cases...)
+;;note: in the legacy implementation, we had a separate bcd for the max
+;;of the scenarios. we just compute that in memory now from bcd_all.txt
+;;effectively.  see taapost.shave/max-by-scenario, which used in
+;;taapost.shave/barchart->src-charts, and barchart->phasedata
+(defn bcds [case-map]
+  (let [[case {:keys [input path]}] (-> case-map first)
+        root-path (io/parent-path path)]
+    (bcd/do-bcds root-path case)
+    ;;Now that we have bcds, we'd like to concat them (this is the format FM expects),
+    ;;so we have a simple function that does that:
+    (bcd/cat-bcds root-path)))
 
 ;;Shave Charts
 ;;============
@@ -358,7 +382,8 @@
 ;;which should provide all the information out of the box.
 
 ;;Since this is typically shared information we'll just keep it global for now.
-(def unit-detail (shave/read-unit-detail (io/file-path root-path "SRC_STR_BRANCH.xlsx")))
+(def default-unit-detail-path (io/file-path root-path "SRC_STR_BRANCH.xlsx"))
+(def default-unit-detail      (shave/read-unit-detail default-unit-detail))
 
 ;;Going this route, we only need the results file and a commensurate unit-detail
 ;;table.  We can interactively render the ph3 branch shave charts pretty easily.
@@ -368,17 +393,13 @@
 ;;for just emitting the plots (you can also print them as a pdf from the browser window
 ;;semi-manually, but headless rendering is more desirable for generating results since
 ;;it requires no visual rendering or web browser).
+
+#_
 (defn render-branch-test []
   (let [dt (tc/dataset (io/file-path root-path "results_AP.txt")
                 {:key-fn keyword :separator \tab})
-        ph3 (shave/phase-data dt unit-detail "phase3")]
+        ph3 (shave/phase-data dt default-unit-detail "phase3")]
     (oz/view! (->  ph3 shave/branch-charts))))
-
-;;Note: we can get the same information from bcd.txt output as an alternative.
-;;Both lead to the same end-state, but this variant supports rendering legacy
-;;results if we need to (as per last year).
-(def bcd  (tc/dataset (io/file-path root-path "bcd_AP.txt") {:separator "\t" :key-fn keyword}))
-(def bcd2 (-> bcd (shave/barchart->src-charts unit-detail)))
 
 ;;You can interactively view subsets of the data using tablecloth to filter down
 ;;the bcd dataset or otherwise transform it prior to supplying to various shave chart operations.
@@ -386,7 +407,8 @@
 ;;charts for conflict and competition in the web browser.
 
 ;;If we want just emit all the typical shave charts, we can do so:
-(defn emit-all-shave-charts [& {:keys [bcd-data] :or {bcd-data bcd2}}]
+(defn emit-all-shave-charts
+  [root-path bcd-data]
   (let [chartroot    (io/file-path root-path "charts")
         competition  (io/file-path chartroot "/branch/competition")
         conflict     (io/file-path chartroot "/branch/conflict")
@@ -407,28 +429,22 @@
                                        :subtitle "Conflict-Phase 3 Most Stressful Scenario"
                                        :root agg}))))
 
-#_
-(oz/view! (-> bcd2
-              (tc/select-rows (fn [{:keys [phase]}] (= phase "phase3")))
-              (shave/branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
-                              :subtitle "Conflict-Phase 3 Most Stressful Scenario"})))
-
-#_
-(oz/view! (-> bcd2
-              (tc/select-rows (fn [{:keys [phase]}] (= phase "comp1")))
-              (shave/branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
-                              :subtitle "Campaigning"})))
-
-#_
-(oz/view! (-> bcd2
-              (shave/agg-branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
-                                  :subtitle "Most Stressful Scenario By Branch"})))
+;;Note: we can get the same information from bcd.txt output as an alternative.
+;;Both lead to the same end-state, but this variant supports rendering legacy
+;;results if we need to (as per last year).
+(defn shave-test []
+  (let [bcd-path     (io/file-path root-path "bcd_AP.txt")
+        unit-detail  (shave/read-unit-detail
+                      (io/file-path root-path "SRC_STR_BRANCH.xlsx"))]
+    (when-not (io/fexists? bcd-path) (bcds))
+    (-> (tc/dataset bcd-path {:separator "\t" :key-fn keyword})
+        (shave/barchart->src-charts unit-detail))))
 
 ;;N-List
 ;;======
 ;;These are the weightings we use for nominal phases.
 ;;They're variable on purpose.
-(def phase-weights
+(def default-phase-weights
   {"comp1" 0.1
    "phase1" 0.1
    "phase2" 0.1
@@ -436,17 +452,77 @@
    "phase4" 0.1
    "comp2" 0.1})
 
-(defn spit-nlist []
-  (let [results-map {"A" (io/file-path root-path "results_AP.txt")
-                     "B" (io/file-path root-path "results_BP.txt")}
-        m4-books    {"A" (io/file-path root-path "m4_book_AP.xlsx")
-                     "B" (io/file-path root-path "m4_book_AP.xlsx")}
-        unit-detail-path (io/file-path root-path "SRC_STR_BRANCH.xlsx")
-        res        (nlist/make-one-n results-map m4-books "."
-                                     phase-weights "one_n"
-                                     unit-detail-path {})]
+;;we use an nlist-spec to define how to label our stuff in the nlist
+;;ultimately.  we encode multiple cases, e.g. A B etc., and for
+;;each case there are local paths for the results and the input
+;;m4book, e.g. results_ap.txt and m4_book_AP.txt
+;;global parameters are merged in outside of the cases entry.
+(def default-nlist-spec
+  {:cases {"A" {:results (io/file-path root-path "results_AP.txt")
+                :m4book  (io/file-path root-path "m4_book_AP.xlsx")}
+           "B" {:results (io/file-path root-path "results_BP.txt")
+                :m4book  (io/file-path root-path "m4_book_AP.xlsx")}}
+   :phase-weights default-phase-weights
+   :unit-detail  (io/file-path root-path "SRC_STR_BRANCH.xlsx")})
+
+(defn map-vals [f m]
+  (reduce-kv (fn [acc k v] (assoc acc k (f v))) m m))
+
+;;helper function to unpack our nlist spec into the legacy
+;;format make-one-n expects.
+(defn unspec [{:keys [cases] :as spec}]
+  (-> spec
+      (dissoc :cases)
+      (assoc :results (map-vals :results cases)
+             :m4books (map-vals :m4book cases))))
+
+(defn spit-nlist [nlist-spec]
+  (let [{:keys [results m4books unit-detail phase-weights]} (unspec nlist-spec)
+        res   (nlist/make-one-n results m4books "."
+                                phase-weights "one_n"
+                                unit-detail {})]
     (->> (-> res nlist/simple-names  (tc/rename-columns (fn [k] (name k))))
          (xl/table->xlsx "res.xlsx" "results"))))
+
+;;the complete all-in-one pipeline.
+;;this composes all our prior functions to:
+;;  for each case,
+;;    build the taa inputs (m4book and friends),
+;;    execute runs to get supply variation results
+;;    generate unified bar chart data from results
+;;    generate shave-charts for both cases from barchart data
+;;    generate n-list workbook for both scenarios.
+
+(defn taa-pipeline
+  ([] (taa-pipeline default-case-map default-nlist-spec default-unit-detail-path))
+  ([case-map nlist-spec unit-detail]
+   (build-case-inputs case-map) ;;build m4workbooks for each case.
+   (run-cases case-map)
+   (bcds case-map)
+   (let [bcd-path    (io/file-path root-path (->> case-map keys first "bcd_AP.txt"))
+         unit-detail (shave/read-unit-detail unit-detail)
+         bcd      (-> (tc/dataset bcd-path {:separator "\t" :key-fn keyword})
+                      (shave/barchart->src-charts unit-detail))]
+     (emit-all-shave-charts :bcd-data bcd))
+   (spit-nlist nlist-spec)))
+
+;;some other visualization API examples.
+#_
+(oz/view! (-> bcd2
+              (tc/select-rows (fn [{:keys [phase]}] (= phase "phase3")))
+              (shave/branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
+                                    :subtitle "Conflict-Phase 3 Most Stressful Scenario"})))
+
+#_
+(oz/view! (-> bcd2
+              (tc/select-rows (fn [{:keys [phase]}] (= phase "comp1")))
+              (shave/branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
+                                    :subtitle "Campaigning"})))
+
+#_
+(oz/view! (-> bcd2
+              (shave/agg-branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
+                                        :subtitle "Most Stressful Scenario By Branch"})))
 
 ;;does a single rep of capacity analysis
 #_#_
