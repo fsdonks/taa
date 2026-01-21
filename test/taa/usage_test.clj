@@ -65,12 +65,18 @@
 
 ;;currently expects a worbook with a sigle spreadsheet.
 ;;multisheet books aren't supported (could be).
-;;I'm pretts sure the values are path-relative to project root.
+;;I'm pretty sure the values are path-relative to project root.
 (def forge-AP {"A" "FORGE_A.xlsx"})
 (def forge-BP {"B" "FORGE_B.xlsx"})
 
 ;;Phase definitions
-
+;;These correspond to the periods in a typical
+;;MARATHON periods worksheet/table.  They define
+;;the nominal phases we use to report results, and
+;;may not map 1:1 with the policy change periods (although
+;;they typically do).  Nominal phases will influence our results
+;;generated since they form the sampling bins for demand fill,etc.
+;;These are an entirely post processing phenomenon.
 (def phases-AP
   [["comp1" 1 1334]
    ["phase1" 1335 1380]
@@ -101,15 +107,6 @@
    "phase2" 0.125
    "phase3" 0.5
    "phase4" 0.125})
-
-(def big-srcs
-  #{"10557KC00"
-    "27523KC00"
-    "19463P200"
-    "09547KB10"
-    "10557KB00"
-    "55508KA00"
-    "41750K000"})
 
 (def curr-supply-demand "notional.xlsx")
 
@@ -212,7 +209,9 @@
    :lower-rc 1
    :min-distance 0
    ;;24 for TAA runs on our 2 fastest computers, 20 for other 2
-   :threads 24
+   ;;use guess-physical-cores to try to allocate 1:1 thread per core. Adding more threads doesn't help
+   ;;due to contention and diminishing returns.
+   :threads (marathon.analysis.util/guess-physical-cores) ;24
    ;;include no demand should be false unless we are doing the 1-n RA runs.
    :include-no-demand true
    :bin-forward? true
@@ -223,6 +222,10 @@
 ;;policy-map-name and default-rc policy are also the same as AP for the same
 ;;reasons.
 
+;;We can create a specification for a different input just by associng
+;;onto the other map where there are changes to the keys.  In this case,
+;;we change the timeline, the simulation periods/phases, vignettes,
+;;the forge demand, etc.
 (def input-map-BP
   (assoc input-map-AP
          :timeline-name "timeline_B.xlsx"
@@ -233,18 +236,16 @@
          :periods-name "periods_BP.xlsx"))
 
 ;;rc will get tacked on for rc runs
-(def demand-names ["AP" "BP"])
 (def path-AP (core/m4-path input-map-AP "AP"))
 (def path-BP (core/m4-path input-map-BP "BP"))
-;;parent directory of our inputs, useful for building
-;;relative paths later.  this "should" be equivalent
-;;to (input-map-AP :resources-root) by convention.
+;;parent directory of our inputs, useful for building relative paths later.
+;;this "should" be equivalent to (input-map-AP :resources-root) by convention.
 (def root-path (io/parent-path path-AP))
 
-;;we define case definitions as a map of {case {:keys [path input]}}
-;;where the case key is a string identifier that typically matches the
-;;identifier key in the input map, path is the path to the m4workbook
-;;built earlier, and input is the in-memory input-map for the case.
+;;we define case definitions as a map of {case {:keys [path input]}} where the
+;;case key is a string identifier that typically matches the identifier key in
+;;the input map, path is the path to the m4workbook built earlier, and input is
+;;the in-memory input-map for the case.x
 (def default-cases
   {"AP" {:path path-AP
          :input input-map-AP}
@@ -254,13 +255,13 @@
 ;;Workbook Prep
 ;;=============
 
-;;Compiles discrete m4 workbooks with demand, policy, supply
-;;settings derived from the input-map and associated distinct input worksheets.
-;;This builds a single artifact that can be run through typical
-;;capacity analysis (it will include all SRCs by default though).
-;;This deterministic artifact will not have random initial conditions; those
-;;are determined later in the pipeline when we perform our design of experiment
-;;using supply variation, which other aspects of the input-map will parameterize.
+;;Compiles discrete m4 workbooks with demand, policy, supply settings derived
+;;from the input-map and associated distinct input worksheets. This builds a
+;;single artifact that can be run through typical capacity analysis (it will
+;;include all SRCs by default though). This deterministic artifact will not have
+;;random initial conditions; those are determined later in the pipeline when we
+;;perform our design of experiment using supply variation, which other aspects
+;;of the input-map will parameterize.
 
 ;;Note the useage of the *default-rc-ratio*.  This is an optional dynamic variable
 ;;that we can bind at build-time to define a global default for rc availability
@@ -300,7 +301,8 @@
 ;;useful for testing e.g. quick-reps.
 (def ^:dynamic *rep-limit*)
 
-;;currently dumps output to ./random-out.txt
+;;currently dumps status output to ./random-out.txt
+;;unless :run-site is :debug or :cluster, which print to console.
 (defn run-cases [case-map & {:keys [rep-limit]}]
   (let [rep-limit (or rep-limit *rep-limit*)
         project->reps (if rep-limit
@@ -341,15 +343,19 @@
 ;;perform bulk experiments and sensitivity analyses, and then collect canonical results
 ;;for comparison.
 
-;;See taapost.bcd/do-bcds for more information on the implementation.
-;;we assume the first case in the case-map is the "base case", which
-;;will show generically as "A" in the barchartdata output file, with
-;;any other case being "B" (legacy assumption of only 2 cases...)
-;;note: in the legacy implementation, we had a separate bcd for the max
-;;of the scenarios. we just compute that in memory now from bcd_all.txt
-;;effectively.  see taapost.shave/max-by-scenario, which used in
+;;See taapost.bcd/do-bcds for more information on the implementation. we assume
+;;the first case in the case-map is the "base case", which will show generically
+;;as "A" in the barchartdata output file, with any other case being "B" (legacy
+;;assumption of only 2 cases...) note: in the legacy implementation, we had a
+;;separate bcd for the max of the scenarios. we just compute that in memory now
+;;from bcd_all.txt effectively. see taapost.shave/max-by-scenario, which used in
 ;;taapost.shave/barchart->src-charts, and barchart->phasedata
-(defn bcds [case-map]
+
+;;this is by convention in bcd/cat-bcds, where we expect to
+;;dump the concatenated bcd-all file.
+(def default-bcd-path (io/file-path root-path "bcd-all.txt"))
+
+(defn build-bcds [case-map]
   (let [[case {:keys [input path]}] (-> case-map first)
         root-path (io/parent-path path)]
     (bcd/do-bcds root-path case)
@@ -397,7 +403,7 @@
 #_
 (defn render-branch-test []
   (let [dt (tc/dataset (io/file-path root-path "results_AP.txt")
-                {:key-fn keyword :separator \tab})
+                       {:key-fn keyword :separator \tab})
         ph3 (shave/phase-data dt default-unit-detail "phase3")]
     (oz/view! (->  ph3 shave/branch-charts))))
 
@@ -427,11 +433,28 @@
         (tc/select-rows (fn [{:keys [phase]}] (= phase "phase3")))
         (shave/emit-agg-branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
                                        :subtitle "Conflict-Phase 3 Most Stressful Scenario"
+                                       :root agg}))
+    (-> bcd-data
+        (tc/select-rows (fn [{:keys [phase]}] (= phase "comp1")))
+        (shave/emit-agg-branch-charts {:title "Aggregated Modeling Results as Percentages of Demand"
+                                       :subtitle "Campaigning"
                                        :root agg}))))
+
+;;High level build task for shave-chart generation intended to be used in
+;;a pipeline.
+(def default-chart-root root-path)
+
+(defn build-shave-charts [chart-root bcd-path unit-detail-path]
+  (let [bcd-path    (io/file-path  bcd-path)
+        unit-detail (shave/read-unit-detail unit-detail-path)
+        bcd-data    (-> (tc/dataset bcd-path {:separator "\t" :key-fn keyword})
+                        (shave/barchart->src-charts unit-detail))]
+    (emit-all-shave-charts chart-root bcd-data)))
 
 ;;Note: we can get the same information from bcd.txt output as an alternative.
 ;;Both lead to the same end-state, but this variant supports rendering legacy
 ;;results if we need to (as per last year).
+#_
 (defn shave-test []
   (let [bcd-path     (io/file-path root-path "bcd_AP.txt")
         unit-detail  (shave/read-unit-detail
@@ -442,7 +465,13 @@
 
 ;;N-List
 ;;======
-;;These are the weightings we use for nominal phases.
+
+;;These are the weightings we use for nominal phases.  When we go to compute
+;;the n-list product, the post processor is going to apply weighting to the expected
+;;fill (e.g. demand met) depending on the phase weights here.  The result is a weighted
+;;score that serves as a primary sorting criterion for the n-list.  The secondary criterion
+;;is excess demand met (e.g. unused-but-available supply).
+
 ;;They're variable on purpose.
 (def default-phase-weights
   {"comp1" 0.1
@@ -459,26 +488,26 @@
 ;;global parameters are merged in outside of the cases entry.
 (def default-nlist-spec
   {:cases {"A" {:results (io/file-path root-path "results_AP.txt")
-                :m4book  (io/file-path root-path "m4_book_AP.xlsx")}
+                :m4book  (io/file-path root-path "m4_book_BP.xlsx")}
            "B" {:results (io/file-path root-path "results_BP.txt")
                 :m4book  (io/file-path root-path "m4_book_AP.xlsx")}}
    :phase-weights default-phase-weights
-   :unit-detail  (io/file-path root-path "SRC_STR_BRANCH.xlsx")})
-
-(defn map-vals [f m]
-  (reduce-kv (fn [acc k v] (assoc acc k (f v))) m m))
+   :unit-detail   default-unit-detail-path
+   :root   root-path})
 
 ;;helper function to unpack our nlist spec into the legacy
 ;;format make-one-n expects.
 (defn unspec [{:keys [cases] :as spec}]
+  (let [map-vals (fn [f m]
+                    (reduce-kv (fn [acc k v] (assoc acc k (f v))) m m))]
   (-> spec
       (dissoc :cases)
       (assoc :results (map-vals :results cases)
-             :m4books (map-vals :m4book cases))))
+             :m4books (map-vals :m4book cases)))))
 
 (defn spit-nlist [nlist-spec]
-  (let [{:keys [results m4books unit-detail phase-weights]} (unspec nlist-spec)
-        res   (nlist/make-one-n results m4books "."
+  (let [{:keys [results m4books unit-detail phase-weights root]} (unspec nlist-spec)
+        res   (nlist/make-one-n results m4books (or root ".")
                                 phase-weights "one_n"
                                 unit-detail {})]
     (->> (-> res nlist/simple-names  (tc/rename-columns (fn [k] (name k))))
@@ -493,18 +522,32 @@
 ;;    generate shave-charts for both cases from barchart data
 ;;    generate n-list workbook for both scenarios.
 
+;;We provide a map of defaults for the stock taa-pipeline
+;;function.
+(def pipeline-defaults
+  {:case-map    default-cases
+   :nlist-spec  default-nlist-spec
+   :unit-detail default-unit-detail-path
+   :bcd-path    default-bcd-path
+   :chart-root  default-chart-root})
+
 (defn taa-pipeline
-  ([] (taa-pipeline default-case-map default-nlist-spec default-unit-detail-path))
-  ([case-map nlist-spec unit-detail]
+  ([] (taa-pipeline pipeline-defaults))
+  ([{:keys [case-map nlist-spec unit-detail bcd-path chart-root]}]
    (build-case-inputs case-map) ;;build m4workbooks for each case.
-   (run-cases case-map)
-   (bcds case-map)
-   (let [bcd-path    (io/file-path root-path (->> case-map keys first "bcd_AP.txt"))
-         unit-detail (shave/read-unit-detail unit-detail)
-         bcd      (-> (tc/dataset bcd-path {:separator "\t" :key-fn keyword})
-                      (shave/barchart->src-charts unit-detail))]
-     (emit-all-shave-charts :bcd-data bcd))
+   (run-cases  case-map)
+   (build-bcds case-map)
+   (build-shave-charts chart-root bcd-path unit-detail)
    (spit-nlist nlist-spec)))
+
+
+;;Let's run the pipeline with a single rep, and print output
+;;to the console instead of piping to random-out.txt
+#_
+(binding [*rep-limit* 1]
+  (let [cases (zipmap (keys default-cases)
+                      (->> default-cases vals (map (fn [m] (assoc-in m [:input :run-site] :debug)))))]
+    (taa-pipeline (assoc pipeline-defaults :case-map cases))))
 
 ;;some other visualization API examples.
 #_
@@ -542,6 +585,15 @@
 (def src-fixes
   #{"44335K000"
     "10633P000"})
+#_
+(def big-srcs
+  #{"10557KC00"
+    "27523KC00"
+    "19463P200"
+    "09547KB10"
+    "10557KB00"
+    "55508KA00"
+    "41750K000"})
 
 ;;redo ra supply variation for 1-n runs
 #_
