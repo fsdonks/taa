@@ -3,7 +3,7 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [marathon "4.2.20-SNAPSHOT"]
                  [m4peer   "0.1.2-BETA"]
-                 [taapost "97796765d01a19e8ec019dc351ace5750dddbed6" #_"0.1.3-SNAPSHOT"
+                 [taapost "0.1.4-SNAPSHOT"
                   #_#_:exclusions [jfree/jfreechart jfree/jfreechart com.taoensso/nippy
                                commons-codec]]
                  ;;override marathon's.  we should ditch the one in m4.
